@@ -1,0 +1,3325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light">
+<title>Dose Logic — Caregiver (Demo)</title>
+<meta name="description" content="Dose Logic caregiver companion app — demo build with simulated data.">
+<!-- Favicon is the carousel mark inlined as a data: URI. No file request, no network. -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='26' fill='%23ffffff'/%3E%3Cpath d='M32 32L22.05 7.98A26 26 0 0 1 41.95 7.98Z' fill='%23CC0000'/%3E%3Cg stroke='%231A1A1A' stroke-width='2.6' fill='none' stroke-linecap='round'%3E%3Ccircle cx='32' cy='32' r='26'/%3E%3Cpath d='M32 32L22.05 7.98M32 32L41.95 7.98M32 32L56.02 22.05M32 32L56.02 41.95M32 32L41.95 56.02M32 32L22.05 56.02M32 32L7.98 41.95M32 32L7.98 22.05'/%3E%3C/g%3E%3C/svg%3E">
+<style>
+/* ==========================================================================
+   DOSE LOGIC — design tokens
+   Palette is fixed by the brand deck. No hues outside this set.
+   The *-tint values are lightened versions of the three status hues, not new
+   hues: the status table calls for "tinted background" chips, and the tint has
+   to exist as a token so it cannot drift per-component.
+   ========================================================================== */
+:root{
+  /* Brand */
+  --dl-red:        #CC0000;   /* logo mark + missed dose ONLY. Nothing else. */
+  --dl-ink:        #1A1A1A;   /* primary text, primary buttons */
+
+  /* Neutrals */
+  --dl-slate:      #4C555C;   /* secondary text, labels */
+  --dl-mute:       #7A848B;   /* icons, borders, disabled — NOT body text (3.8:1) */
+  --dl-line:       #DDE2E5;   /* borders, dividers, chart gridlines */
+  --dl-surface:    #F3F5F6;   /* page background */
+  --dl-card:       #FFFFFF;   /* raised surfaces */
+
+  /* Status — three hues only */
+  --dl-green:      #157F3F;
+  --dl-amber:      #B36B00;
+  --dl-amber-fill: #F5A623;   /* solid fill, dispensed_not_taken only */
+
+  /* Status tints (same hues, lightened for chip backgrounds) */
+  --dl-green-tint: #EFF7F2;
+  --dl-amber-tint: #FBF2E2;
+  --dl-red-tint:   #FCECEC;
+  --dl-ink-tint:   #EDEFF0;
+
+  /* Type scale — Arial-first system stack, no web font request */
+  --dl-font: Arial, "Helvetica Neue", Helvetica, "Segoe UI", system-ui, sans-serif;
+  --fs-label:  0.8125rem;  /* 13px — uppercase section labels only */
+  --fs-meta:   0.875rem;   /* 14px — timestamps, captions */
+  --fs-body:   1.0625rem;  /* 17px — body floor */
+  --fs-md:     1.1875rem;  /* 19px */
+  --fs-lg:     1.5rem;     /* 24px */
+  --fs-xl:     2rem;       /* 32px */
+  --fs-data:   2.75rem;    /* 44px — the numbers people scan for */
+  --fs-hero:   3.5rem;     /* 56px — next-dose time */
+
+  /* Space + shape */
+  --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px; --sp-4: 16px;
+  --sp-5: 24px; --sp-6: 32px; --sp-7: 48px; --sp-8: 64px;
+  --r-sm: 4px;  --r-md: 8px;  --r-lg: 14px; --r-pill: 999px;
+  --shadow: 0 1px 2px rgba(26,26,26,.05), 0 6px 18px -10px rgba(26,26,26,.22);
+  --tap: 44px;                       /* minimum touch target — older users */
+  --nav-w: 244px;
+}
+
+/* ===== Reset ============================================================= */
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body,h1,h2,h3,h4,p,figure,ul,ol,dl,dd,fieldset{margin:0}
+ul,ol{padding:0;list-style:none}
+fieldset{border:0;padding:0;min-width:0}
+img,svg{display:block;max-width:100%}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;background:none;border:0}
+table{border-collapse:collapse;width:100%}
+
+body{
+  font-family:var(--dl-font);
+  font-size:var(--fs-body);
+  line-height:1.5;
+  color:var(--dl-ink);
+  background:var(--dl-surface);
+  -webkit-font-smoothing:antialiased;
+}
+
+/* ===== Focus ============================================================= */
+/* Ink ring + offset so it reads on both --dl-surface and --dl-card without
+   introducing a focus hue outside the fixed palette. */
+:focus{outline:none}
+:focus-visible{outline:3px solid var(--dl-ink);outline-offset:2px;border-radius:var(--r-sm)}
+.skip-link{
+  position:absolute;left:var(--sp-4);top:-100px;z-index:200;
+  background:var(--dl-ink);color:var(--dl-card);
+  padding:var(--sp-3) var(--sp-4);border-radius:var(--r-md);font-weight:700;
+  text-decoration:none;transition:top .12s ease;
+}
+.skip-link:focus-visible{top:var(--sp-4)}
+.sr-only{
+  position:absolute;width:1px;height:1px;padding:0;margin:-1px;
+  overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0;
+}
+
+/* ===== Typography ======================================================== */
+h1,h2,h3,h4{line-height:1.2;letter-spacing:-.01em;font-weight:700}
+h1{font-size:var(--fs-xl)}
+h2{font-size:var(--fs-lg)}
+h3{font-size:var(--fs-md)}
+.label{
+  font-size:var(--fs-label);font-weight:700;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--dl-slate);
+}
+.meta{font-size:var(--fs-meta);color:var(--dl-slate)}
+.num{font-variant-numeric:tabular-nums}
+.big-num{
+  font-size:var(--fs-data);font-weight:700;letter-spacing:-.03em;
+  line-height:1;font-variant-numeric:tabular-nums;
+}
+
+/* ===== Logo ============================================================== */
+.lockup{display:flex;align-items:center;gap:var(--sp-3);text-decoration:none;color:inherit}
+.lockup .wordmark{
+  font-weight:700;font-size:var(--fs-md);letter-spacing:-.025em;
+  color:var(--dl-ink);white-space:nowrap;
+}
+.dl-mark{flex:none}
+/* Loading indicator: the filled wedge STEPS 45 degrees at a time, because that
+   is what the NEMA-17 does. A smooth spin would misrepresent the mechanism. */
+.dl-mark--stepping{animation:dl-step 2.8s steps(8,end) infinite}
+@keyframes dl-step{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+
+/* ===== App shell ========================================================= */
+.app{min-height:100vh;display:flex;flex-direction:column}
+.topbar{
+  position:sticky;top:0;z-index:60;
+  display:flex;align-items:center;gap:var(--sp-4);
+  padding:var(--sp-3) var(--sp-5);
+  background:var(--dl-card);border-bottom:1px solid var(--dl-line);
+}
+.topbar__spacer{flex:1}
+.demo-badge{
+  display:inline-flex;align-items:center;gap:var(--sp-2);
+  font-size:var(--fs-meta);font-weight:700;
+  color:var(--dl-ink);background:var(--dl-ink-tint);
+  border:1px solid var(--dl-line);
+  padding:6px var(--sp-3);border-radius:var(--r-pill);white-space:nowrap;
+}
+.demo-badge::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--dl-ink);flex:none}
+.shell{flex:1;display:flex;align-items:flex-start}
+
+/* Side nav (desktop) */
+.sidenav{
+  width:var(--nav-w);flex:none;position:sticky;top:61px;
+  height:calc(100vh - 61px);overflow-y:auto;
+  padding:var(--sp-5) var(--sp-3);
+  background:var(--dl-card);border-right:1px solid var(--dl-line);
+}
+.sidenav__group+.sidenav__group{margin-top:var(--sp-5);padding-top:var(--sp-5);border-top:1px solid var(--dl-line)}
+.sidenav .label{padding:0 var(--sp-3) var(--sp-2)}
+.navlink{
+  display:flex;align-items:center;gap:var(--sp-3);width:100%;
+  min-height:var(--tap);padding:var(--sp-2) var(--sp-3);
+  border-radius:var(--r-md);color:var(--dl-slate);font-weight:600;text-align:left;
+}
+.navlink:hover{background:var(--dl-surface);color:var(--dl-ink)}
+.navlink[aria-current="page"]{background:var(--dl-ink);color:var(--dl-card)}
+.navlink[aria-current="page"] .navlink__icon{color:var(--dl-card)}
+.navlink__icon{color:var(--dl-mute);flex:none}
+.navlink:hover .navlink__icon{color:var(--dl-ink)}
+.navlink__count{
+  margin-left:auto;font-size:var(--fs-meta);font-weight:700;
+  background:var(--dl-ink);color:var(--dl-card);
+  min-width:22px;height:22px;padding:0 6px;border-radius:var(--r-pill);
+  display:inline-flex;align-items:center;justify-content:center;
+}
+.navlink[aria-current="page"] .navlink__count{background:var(--dl-card);color:var(--dl-ink)}
+.navlink--alt{border:1px dashed var(--dl-line)}
+
+/* Main */
+.main{flex:1;min-width:0;padding:var(--sp-6) var(--sp-6) var(--sp-8)}
+.view[hidden]{display:none}
+.view__head{margin-bottom:var(--sp-5)}
+.view__head p{color:var(--dl-slate);margin-top:var(--sp-2);max-width:62ch}
+
+/* Bottom tab bar (mobile) */
+.tabbar{
+  display:none;position:sticky;bottom:0;z-index:60;
+  background:var(--dl-card);border-top:1px solid var(--dl-line);
+  padding:var(--sp-1) var(--sp-2) calc(var(--sp-1) + env(safe-area-inset-bottom,0px));
+}
+.tabbar__list{display:flex}
+.tabbar__list li{flex:1}
+.tablink{
+  position:relative;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:3px;width:100%;min-height:var(--tap);padding:var(--sp-2) 2px;
+  font-size:11px;font-weight:700;color:var(--dl-slate);border-radius:var(--r-md);
+}
+.tablink[aria-current="page"],
+.tablink[aria-current="page"] .tablink__icon{color:var(--dl-ink)}
+.tablink__icon{color:var(--dl-mute)}
+.tablink__dot{
+  position:absolute;top:6px;left:50%;margin-left:6px;
+  width:8px;height:8px;border-radius:50%;background:var(--dl-ink);
+}
+
+/* ===== Surfaces =========================================================
+   Deliberately NOT one uniform rounded-card system. Three levels:
+   .panel  = plain bordered block, the workhorse
+   .slab   = flat ink block, used once per screen for the primary reading
+   .rail   = borderless grouped list, no shadow, for dense data
+   ======================================================================== */
+.panel{
+  background:var(--dl-card);border:1px solid var(--dl-line);
+  border-radius:var(--r-lg);padding:var(--sp-5);
+}
+.panel--flush{padding:0;overflow:hidden;min-width:0}
+.panel__head{
+  display:flex;align-items:center;gap:var(--sp-3);flex-wrap:wrap;
+  padding:var(--sp-4) var(--sp-5);border-bottom:1px solid var(--dl-line);
+}
+.panel__head h2,.panel__head h3{margin-right:auto}
+.panel__body{padding:var(--sp-5)}
+.slab{background:var(--dl-ink);color:var(--dl-card);border-radius:var(--r-lg);padding:var(--sp-6)}
+.slab .label{color:rgba(255,255,255,.72)}
+.rail{background:var(--dl-card);border:1px solid var(--dl-line);border-radius:var(--r-lg);overflow:hidden}
+.rail>*+*{border-top:1px solid var(--dl-line)}
+
+.grid{display:grid;gap:var(--sp-5)}
+/* Grid and flex items default to min-width:auto, which lets a wide table push
+   the whole page sideways instead of scrolling inside its own box. */
+.grid>*,.stack>*{min-width:0}
+.grid--home{grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);align-items:start}
+.grid--2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.grid--3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.stack{display:grid;gap:var(--sp-5)}
+.row{display:flex;align-items:center;gap:var(--sp-3);flex-wrap:wrap}
+.row--tight{gap:var(--sp-2)}
+.push{margin-left:auto}
+
+/* ===== Buttons =========================================================== */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:var(--sp-2);
+  min-height:var(--tap);padding:var(--sp-2) var(--sp-4);
+  border-radius:var(--r-md);font-weight:700;font-size:var(--fs-body);
+  border:1px solid transparent;text-decoration:none;white-space:nowrap;
+  transition:background-color .12s ease,border-color .12s ease,color .12s ease;
+}
+.btn--primary{background:var(--dl-ink);color:var(--dl-card)}
+.btn--primary:hover{background:#000}
+.btn--secondary{background:var(--dl-card);color:var(--dl-ink);border-color:var(--dl-line)}
+.btn--secondary:hover{border-color:var(--dl-slate);background:var(--dl-surface)}
+.btn--ghost{background:transparent;color:var(--dl-slate);padding-inline:var(--sp-3)}
+.btn--ghost:hover{background:var(--dl-surface);color:var(--dl-ink)}
+.btn--onink{background:var(--dl-card);color:var(--dl-ink)}
+.btn--onink:hover{background:var(--dl-line)}
+/* Still 44px tall: "small" here means quieter type and tighter side padding,
+   never a smaller hit area — the users are older and often on a tablet. */
+.btn--sm{min-height:var(--tap);font-size:var(--fs-meta);padding:var(--sp-1) var(--sp-3)}
+.btn--block{width:100%}
+.btn[disabled],.btn[aria-disabled="true"]{
+  opacity:1;background:var(--dl-surface);color:var(--dl-mute);
+  border-color:var(--dl-line);cursor:not-allowed;
+}
+.btn__icon{flex:none}
+/* Hit-area shim: small controls keep a 44px target without a 44px box. */
+.hit{position:relative}
+.hit::after{content:"";position:absolute;inset:50% 50%;width:var(--tap);height:var(--tap);transform:translate(-50%,-50%)}
+
+/* Segmented control — patient selector + range filters */
+.seg{display:inline-flex;background:var(--dl-surface);border:1px solid var(--dl-line);border-radius:var(--r-md);padding:3px;gap:3px}
+.seg__btn{
+  min-height:var(--tap);padding:0 var(--sp-3);border-radius:6px;
+  font-weight:700;font-size:var(--fs-meta);color:var(--dl-slate);
+}
+.seg__btn[aria-pressed="true"]{background:var(--dl-card);color:var(--dl-ink);box-shadow:0 1px 2px rgba(26,26,26,.14)}
+
+/* ===== Status chips =====================================================
+   Urgency is carried by FILL, not hue: outline -> heavy outline -> tinted ->
+   SOLID. That keeps all seven states apart for a colorblind viewer and from
+   across a room. Every chip also carries a distinct icon shape.
+   ======================================================================== */
+.chip{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:5px var(--sp-3) 5px var(--sp-2);border-radius:var(--r-pill);
+  font-size:var(--fs-meta);font-weight:700;white-space:nowrap;
+  border:1px solid transparent;background:transparent;
+}
+.chip__icon{flex:none}
+.chip--upcoming{border-color:var(--dl-mute);color:var(--dl-slate)}
+.chip--upcoming .chip__icon{color:var(--dl-mute)}
+.chip--due{border-color:var(--dl-ink);border-width:2px;color:var(--dl-ink);padding-block:4px}
+.chip--due .chip__icon{color:var(--dl-ink)}
+.chip--dispensed_not_taken{
+  background:var(--dl-amber-fill);border-color:var(--dl-amber-fill);
+  color:var(--dl-ink);box-shadow:0 1px 2px rgba(26,26,26,.18);
+}
+.chip--dispensed_not_taken .chip__icon{color:var(--dl-ink)}
+.chip--taken{background:var(--dl-green-tint);border-color:var(--dl-green);color:var(--dl-green)}
+.chip--taken .chip__icon{color:var(--dl-green)}
+.chip--late{background:var(--dl-amber-tint);border-color:var(--dl-amber);color:var(--dl-ink)}
+.chip--late .chip__icon{color:var(--dl-amber)}
+.chip--missed{background:var(--dl-red-tint);border-color:var(--dl-red);color:var(--dl-red)}
+.chip--missed .chip__icon{color:var(--dl-red)}
+.chip--skipped{border-color:var(--dl-line);color:var(--dl-slate)}
+.chip--skipped .chip__label{text-decoration:line-through}
+.chip--skipped .chip__icon{color:var(--dl-mute)}
+
+/* The only pulsing element in the app, on the only solid-filled state. */
+.pulse-dot{width:9px;height:9px;border-radius:50%;background:var(--dl-ink);flex:none;animation:dl-pulse 1.8s ease-in-out infinite}
+@keyframes dl-pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.28;transform:scale(.72)}}
+
+/* ===== Hero: next dose ================================================== */
+.hero{display:grid;gap:var(--sp-5);grid-template-columns:minmax(0,1fr) auto;align-items:end}
+.hero__time{font-size:var(--fs-hero);font-weight:700;letter-spacing:-.04em;line-height:.95;font-variant-numeric:tabular-nums}
+.hero__count{font-size:var(--fs-lg);font-weight:700;color:rgba(255,255,255,.86);margin-top:var(--sp-2)}
+.hero__meds{margin-top:var(--sp-4);display:grid;gap:6px}
+.hero__med{display:flex;gap:var(--sp-3);align-items:baseline;font-size:var(--fs-md)}
+.hero__med b{font-weight:700}
+.hero__med span{color:rgba(255,255,255,.7);font-size:var(--fs-meta)}
+
+/* ===== Attention strip ================================================== */
+.attn{border:2px solid var(--dl-ink);border-radius:var(--r-lg);background:var(--dl-card);overflow:hidden}
+.attn__head{display:flex;align-items:center;gap:var(--sp-2);padding:var(--sp-3) var(--sp-5);background:var(--dl-ink);color:var(--dl-card)}
+.attn__head .label{color:var(--dl-card)}
+.attn__item{display:flex;gap:var(--sp-4);align-items:center;flex-wrap:wrap;padding:var(--sp-4) var(--sp-5)}
+.attn__item+.attn__item{border-top:1px solid var(--dl-line)}
+.attn__body{flex:1;min-width:200px}
+.attn__body strong{display:block;font-size:var(--fs-md)}
+
+/* ===== Timeline ========================================================= */
+.tl{position:relative;padding-left:var(--sp-6)}
+.tl::before{content:"";position:absolute;left:11px;top:10px;bottom:10px;width:2px;background:var(--dl-line)}
+.tl__slot+.tl__slot{margin-top:var(--sp-5)}
+/* The marker sits in the rail gutter created by .tl's left padding, not at the
+   slot's own left edge — otherwise it lands on top of the dose time. */
+.tl__marker{position:absolute;left:calc(-1 * var(--sp-6));width:24px;height:24px;border-radius:50%;background:var(--dl-card);border:2px solid var(--dl-line);display:grid;place-items:center}
+.tl__slot--past .tl__marker{border-color:var(--dl-slate)}
+.tl__slot--now .tl__marker{border-color:var(--dl-ink);border-width:3px}
+.tl__slot--now .tl__marker::after{content:"";width:8px;height:8px;border-radius:50%;background:var(--dl-ink)}
+.tl__slot{position:relative}
+.tl__time{font-size:var(--fs-md);font-weight:700;font-variant-numeric:tabular-nums;line-height:1.3}
+.tl__doses{margin-top:var(--sp-2);display:grid;gap:var(--sp-2)}
+.tl__dose{
+  display:flex;align-items:center;gap:var(--sp-3);flex-wrap:wrap;
+  width:100%;text-align:left;min-height:var(--tap);
+  padding:var(--sp-2) var(--sp-3);border-radius:var(--r-md);border:1px solid var(--dl-line);
+  background:var(--dl-card);
+}
+.tl__dose:hover{border-color:var(--dl-slate);background:var(--dl-surface)}
+.tl__dose--flag{border-width:2px;border-color:var(--dl-ink)}
+.tl__name{font-weight:700;flex:1;min-width:140px}
+.tl__name small{display:block;font-weight:400;font-size:var(--fs-meta);color:var(--dl-slate)}
+.tl__stamp{font-size:var(--fs-meta);color:var(--dl-slate);font-variant-numeric:tabular-nums}
+
+/* ===== Device status line =============================================== */
+.devline{display:flex;align-items:center;gap:var(--sp-3);flex-wrap:wrap;font-size:var(--fs-meta);color:var(--dl-slate)}
+.dot{width:10px;height:10px;border-radius:50%;flex:none}
+.dot--on{background:var(--dl-green)}
+/* Offline is an attention state, not a missed dose, so it must not take red.
+   Hollow-vs-filled carries it: online is a solid green dot, offline a hollow
+   amber ring — still legible with the colour stripped out. */
+.dot--off{background:transparent;border:2.5px solid var(--dl-amber)}
+.devline b{color:var(--dl-ink);font-size:var(--fs-body)}
+.devline__sep{color:var(--dl-line)}
+
+/* ===== Carousel ========================================================= */
+.carousel{display:grid;grid-template-columns:minmax(300px,440px) minmax(0,1fr);gap:var(--sp-6);align-items:start}
+.carousel__stage{background:var(--dl-card);border:1px solid var(--dl-line);border-radius:var(--r-lg);padding:var(--sp-5)}
+.carousel__svg{width:100%;height:auto}
+/* The ring rotates in 45-degree steps to match the real indexing. Labels are
+   counter-rotated by the same angle about their own centres so the text stays
+   upright while the carousel turns under it. */
+.carousel__ring{
+  transform:rotate(var(--spin,0deg));transform-origin:200px 200px;
+  transition:transform .7s cubic-bezier(.2,.9,.2,1);
+}
+.cart-label{
+  transform:rotate(calc(-1 * var(--spin,0deg)));
+  transition:transform .7s cubic-bezier(.2,.9,.2,1);
+}
+.cart-hit{cursor:pointer}
+.cart-hit:focus-visible{outline:3px solid var(--dl-ink);outline-offset:2px}
+.cart-wedge{transition:fill .2s ease}
+.cart-list{display:grid;gap:var(--sp-2)}
+.cart-row{
+  display:flex;align-items:center;gap:var(--sp-3);width:100%;text-align:left;
+  min-height:var(--tap);padding:var(--sp-3);border:1px solid var(--dl-line);
+  border-radius:var(--r-md);background:var(--dl-card);
+}
+.cart-row:hover{border-color:var(--dl-slate);background:var(--dl-surface)}
+.cart-row[aria-pressed="true"]{border-color:var(--dl-ink);border-width:2px;padding:11px}
+.cart-row__pos{
+  width:30px;height:30px;flex:none;border-radius:50%;display:grid;place-items:center;
+  font-weight:700;font-size:var(--fs-meta);background:var(--dl-ink-tint);color:var(--dl-ink);
+}
+.cart-row__pos--empty{background:transparent;border:1px dashed var(--dl-mute);color:var(--dl-slate)}
+.cart-row__name{flex:1;min-width:0;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cart-row__name small{display:block;font-weight:400;font-size:var(--fs-meta);color:var(--dl-slate)}
+.cart-row__count{font-variant-numeric:tabular-nums;font-weight:700;text-align:right}
+.cart-row__count small{display:block;font-weight:400;font-size:var(--fs-meta);color:var(--dl-slate)}
+.meter{height:6px;border-radius:3px;background:var(--dl-line);overflow:hidden;margin-top:6px}
+.meter__fill{height:100%;background:var(--dl-ink)}
+.meter__fill--low{background:var(--dl-amber)}
+.flag-low{
+  display:inline-flex;align-items:center;gap:5px;font-size:var(--fs-meta);font-weight:700;
+  color:var(--dl-ink);background:var(--dl-amber-tint);border:1px solid var(--dl-amber);
+  padding:2px var(--sp-2);border-radius:var(--r-pill);
+}
+
+/* ===== Charts (all inline SVG generated from data) ====================== */
+.chart{width:100%;height:auto;display:block;overflow:visible}
+.chart text{font-family:var(--dl-font);fill:var(--dl-slate)}
+.chart .grid-line{stroke:var(--dl-line);stroke-width:1}
+.chart .axis-label{font-size:12px}
+.chart .bar-adh{fill:var(--dl-ink)}
+.chart .bar-miss{fill:var(--dl-line)}
+.chart .bar-low{fill:var(--dl-amber)}
+.chart__legend{display:flex;gap:var(--sp-4);flex-wrap:wrap;font-size:var(--fs-meta);color:var(--dl-slate);margin-top:var(--sp-3)}
+.chart__key{display:inline-flex;align-items:center;gap:6px}
+.chart__swatch{width:12px;height:12px;border-radius:2px;flex:none}
+.spark{width:100%;max-width:220px;height:auto}
+.insight{
+  border-left:3px solid var(--dl-ink);padding:var(--sp-2) 0 var(--sp-2) var(--sp-4);
+  color:var(--dl-slate);font-size:var(--fs-meta);
+}
+.insight b{color:var(--dl-ink)}
+
+/* ===== Forms ============================================================ */
+.field{display:grid;gap:6px;margin-bottom:var(--sp-4)}
+.field>label{font-size:var(--fs-meta);font-weight:700;color:var(--dl-slate)}
+.field input[type=text],.field input[type=number],.field input[type=date],
+.field input[type=time],.field select,.field textarea{
+  min-height:var(--tap);width:100%;padding:var(--sp-2) var(--sp-3);
+  border:1px solid var(--dl-line);border-radius:var(--r-md);background:var(--dl-card);
+}
+.field input:hover,.field select:hover{border-color:var(--dl-slate)}
+.field__hint{font-size:var(--fs-meta);color:var(--dl-slate)}
+.field__error{
+  display:flex;gap:6px;align-items:flex-start;font-size:var(--fs-meta);font-weight:700;
+  color:var(--dl-ink);background:var(--dl-amber-tint);border:1px solid var(--dl-amber);
+  border-radius:var(--r-md);padding:var(--sp-2) var(--sp-3);
+}
+.field--invalid input,.field--invalid select{border-color:var(--dl-amber);border-width:2px}
+.checks{display:flex;flex-wrap:wrap;gap:var(--sp-2)}
+.check{
+  display:inline-flex;align-items:center;gap:var(--sp-2);min-height:var(--tap);
+  padding:var(--sp-2) var(--sp-3);border:1px solid var(--dl-line);
+  border-radius:var(--r-md);background:var(--dl-card);cursor:pointer;font-weight:600;
+}
+.check input{width:18px;height:18px;accent-color:#1A1A1A;cursor:pointer}
+.check:has(input:checked){border-color:var(--dl-ink);border-width:2px;padding:var(--sp-2) 11px}
+.form-actions{display:flex;gap:var(--sp-3);flex-wrap:wrap;margin-top:var(--sp-5);padding-top:var(--sp-5);border-top:1px solid var(--dl-line)}
+
+/* ===== Tables =========================================================== */
+/* Wide data tables scroll inside their own box. The page body must never
+   scroll horizontally — at 390px the dose log is simply wider than the phone. */
+.tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;min-width:0;max-width:100%}
+.tbl-wrap:focus-visible{outline:3px solid var(--dl-ink);outline-offset:-3px}
+.tbl{font-size:var(--fs-meta);min-width:560px}
+.tbl th{
+  text-align:left;font-size:var(--fs-label);letter-spacing:.08em;text-transform:uppercase;
+  color:var(--dl-slate);padding:var(--sp-2) var(--sp-3);border-bottom:1px solid var(--dl-line);
+}
+.tbl td{padding:var(--sp-3);border-bottom:1px solid var(--dl-line);vertical-align:middle}
+.tbl tr:last-child td{border-bottom:0}
+.tbl td:first-child,.tbl th:first-child{padding-left:var(--sp-5)}
+.tbl td:last-child,.tbl th:last-child{padding-right:var(--sp-5)}
+.tbl__row{cursor:pointer}
+.tbl__row:hover{background:var(--dl-surface)}
+.tbl__row td:first-child{font-weight:700;font-size:var(--fs-body)}
+
+/* ===== Alerts =========================================================== */
+.alert{display:flex;gap:var(--sp-4);padding:var(--sp-4) var(--sp-5);align-items:flex-start;background:var(--dl-card)}
+.alert--unread{background:var(--dl-surface)}
+.alert__sev{width:36px;height:36px;flex:none;border-radius:50%;display:grid;place-items:center;border:1px solid var(--dl-line)}
+.alert__sev--info{color:var(--dl-slate)}
+.alert__sev--warning{color:var(--dl-amber);border-color:var(--dl-amber);background:var(--dl-amber-tint)}
+/* Urgent covers missed doses AND offline devices, so the badge cannot be red
+   without leaking red onto non-missed events. Severity is carried by weight
+   instead: hairline -> amber tint -> heavy ink. */
+.alert__sev--urgent{color:var(--dl-ink);border-color:var(--dl-ink);border-width:2px;background:var(--dl-ink-tint)}
+.alert__main{flex:1;min-width:0}
+.alert__title{font-weight:700;display:flex;align-items:center;gap:var(--sp-2);flex-wrap:wrap}
+.alert__unread-dot{width:8px;height:8px;border-radius:50%;background:var(--dl-ink);flex:none}
+.alert__what{color:var(--dl-slate);margin-top:2px}
+.alert__do{margin-top:var(--sp-2);font-size:var(--fs-meta);font-weight:700}
+.alert__time{font-size:var(--fs-meta);color:var(--dl-slate);white-space:nowrap;font-variant-numeric:tabular-nums}
+
+/* ===== Empty states ===================================================== */
+.empty{text-align:center;padding:var(--sp-7) var(--sp-5);color:var(--dl-slate)}
+.empty h3{color:var(--dl-ink);margin-bottom:var(--sp-2)}
+.empty .btn{margin-top:var(--sp-4)}
+
+/* ===== Modal / scanner ================================================== */
+.modal[hidden]{display:none}
+.modal{position:fixed;inset:0;z-index:120;display:grid;place-items:center;padding:var(--sp-4)}
+.modal__scrim{position:absolute;inset:0;background:rgba(26,26,26,.55)}
+.modal__box{
+  position:relative;background:var(--dl-card);border-radius:var(--r-lg);
+  width:min(560px,100%);max-height:90vh;overflow:auto;box-shadow:var(--shadow);
+}
+.modal__head{display:flex;align-items:center;gap:var(--sp-3);padding:var(--sp-4) var(--sp-5);border-bottom:1px solid var(--dl-line)}
+.modal__head h2{margin-right:auto;font-size:var(--fs-md)}
+.modal__body{padding:var(--sp-5)}
+.modal__foot{display:flex;gap:var(--sp-3);flex-wrap:wrap;padding:var(--sp-4) var(--sp-5);border-top:1px solid var(--dl-line)}
+
+/* Viewfinder. Simulated only — the app never requests camera access. */
+.scan{background:var(--dl-ink);border-radius:var(--r-md);aspect-ratio:4/3;position:relative;overflow:hidden;display:grid;place-items:center}
+.scan__frame{position:absolute;inset:14% 10%;border-radius:var(--r-md)}
+.scan__frame span{position:absolute;width:34px;height:34px;border:3px solid var(--dl-card)}
+.scan__frame span:nth-child(1){top:0;left:0;border-right:0;border-bottom:0;border-radius:var(--r-md) 0 0 0}
+.scan__frame span:nth-child(2){top:0;right:0;border-left:0;border-bottom:0;border-radius:0 var(--r-md) 0 0}
+.scan__frame span:nth-child(3){bottom:0;left:0;border-right:0;border-top:0;border-radius:0 0 0 var(--r-md)}
+.scan__frame span:nth-child(4){bottom:0;right:0;border-left:0;border-top:0;border-radius:0 0 var(--r-md) 0}
+.scan__beam{position:absolute;left:10%;right:10%;height:2px;background:var(--dl-card);box-shadow:0 0 12px rgba(255,255,255,.85);animation:dl-scan 1.6s ease-in-out infinite}
+@keyframes dl-scan{0%,100%{top:16%}50%{top:82%}}
+.scan__hint{position:absolute;bottom:var(--sp-3);left:0;right:0;text-align:center;color:rgba(255,255,255,.8);font-size:var(--fs-meta)}
+.scan__code{font-variant-numeric:tabular-nums;letter-spacing:.06em}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:var(--sp-2) var(--sp-4);font-size:var(--fs-meta)}
+.kv dt{color:var(--dl-slate);font-weight:700}
+.kv dd{color:var(--dl-ink);font-weight:600}
+
+/* Sync state after a schedule edit */
+.sync{display:flex;align-items:center;gap:var(--sp-3);font-weight:700}
+.notice{
+  display:flex;gap:var(--sp-3);align-items:flex-start;
+  border:1px solid var(--dl-line);border-left-width:3px;border-left-color:var(--dl-ink);
+  background:var(--dl-card);border-radius:var(--r-md);padding:var(--sp-3) var(--sp-4);
+}
+.notice--good{border-left-color:var(--dl-green);background:var(--dl-green-tint)}
+.notice--warn{border-left-color:var(--dl-amber);background:var(--dl-amber-tint)}
+
+/* ===== Toast ============================================================ */
+.toasts{position:fixed;left:50%;bottom:var(--sp-5);transform:translateX(-50%);z-index:150;display:grid;gap:var(--sp-2);width:min(440px,calc(100vw - 32px))}
+.toast{
+  background:var(--dl-ink);color:var(--dl-card);border-radius:var(--r-md);
+  padding:var(--sp-3) var(--sp-4);font-weight:600;font-size:var(--fs-meta);
+  box-shadow:var(--shadow);animation:dl-toast .18s ease-out;
+}
+@keyframes dl-toast{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+/* ===== Demo controls ==================================================== */
+.demo-fab{
+  position:fixed;right:var(--sp-5);bottom:var(--sp-5);z-index:110;
+  display:inline-flex;align-items:center;gap:var(--sp-2);
+  min-height:var(--tap);padding:0 var(--sp-4);border-radius:var(--r-pill);
+  background:var(--dl-ink);color:var(--dl-card);font-weight:700;box-shadow:var(--shadow);
+}
+.demo-panel[hidden]{display:none}
+.demo-panel{
+  position:fixed;right:var(--sp-5);bottom:calc(var(--sp-5) + var(--tap) + var(--sp-2));
+  z-index:115;width:min(348px,calc(100vw - 32px));max-height:min(72vh,640px);overflow:auto;
+  background:var(--dl-card);border:2px solid var(--dl-ink);border-radius:var(--r-lg);box-shadow:var(--shadow);
+}
+.demo-panel__head{display:flex;align-items:center;gap:var(--sp-2);padding:var(--sp-3) var(--sp-4);background:var(--dl-ink);color:var(--dl-card);position:sticky;top:0}
+.demo-panel__head h2{font-size:var(--fs-body);margin-right:auto}
+.demo-panel__body{padding:var(--sp-4)}
+.demo-group+.demo-group{margin-top:var(--sp-4);padding-top:var(--sp-4);border-top:1px solid var(--dl-line)}
+.demo-group .label{margin-bottom:var(--sp-2)}
+.demo-btns{display:grid;gap:var(--sp-2)}
+.demo-btns--split{grid-template-columns:1fr 1fr}
+.demo-btns--three{grid-template-columns:repeat(3,1fr)}
+.demo-note{font-size:var(--fs-meta);color:var(--dl-slate);margin-top:var(--sp-2)}
+
+/* ===== Patient view =====================================================
+   Visually distinct on purpose: inverted top rule, no side nav chrome,
+   everything at least 24px. It must never be mistaken for the caregiver app.
+   ======================================================================== */
+.pv{max-width:760px;margin:0 auto;font-size:1.5rem;line-height:1.45}
+.pv__banner{background:var(--dl-ink);color:var(--dl-card);border-radius:var(--r-lg);padding:var(--sp-5) var(--sp-6);margin-bottom:var(--sp-5)}
+.pv__banner .label{color:rgba(255,255,255,.75);font-size:1rem}
+.pv__banner h1{font-size:2.25rem;margin-top:var(--sp-2)}
+.pv__card{background:var(--dl-card);border:2px solid var(--dl-line);border-radius:var(--r-lg);padding:var(--sp-6);margin-bottom:var(--sp-4)}
+.pv__card--now{border-color:var(--dl-ink);border-width:3px}
+.pv__time{font-size:3rem;font-weight:700;letter-spacing:-.03em;line-height:1;font-variant-numeric:tabular-nums}
+.pv__what{font-size:1.75rem;font-weight:700;margin-top:var(--sp-3)}
+.pv__list{margin-top:var(--sp-3);display:grid;gap:var(--sp-2)}
+.pv__list li{display:flex;gap:var(--sp-3);align-items:baseline}
+.pv__list b{font-weight:700}
+.pv__state{margin-top:var(--sp-4);display:flex;align-items:center;gap:var(--sp-3);flex-wrap:wrap}
+.pv .chip{font-size:1.25rem;padding:var(--sp-2) var(--sp-4)}
+.pv .chip__icon{width:24px;height:24px}
+.pv__btn{min-height:64px;font-size:1.375rem;padding:0 var(--sp-6)}
+
+/* ===== Print ============================================================
+   A real caregiver workflow: print the summary and take it to an appointment.
+   The app chrome is dropped entirely and #print-only is revealed.
+   ======================================================================== */
+#print-only{display:none}
+@media print{
+  @page{margin:14mm}
+  body{background:#fff;font-size:11pt;color:#000}
+  .topbar,.sidenav,.tabbar,.demo-fab,.demo-panel,.toasts,.skip-link,.modal,.no-print{display:none !important}
+  .app,.shell,.main{display:block;padding:0;margin:0}
+  #app-views{display:none !important}
+  #print-only{display:block !important}
+  .print-head{display:flex;align-items:flex-end;gap:12pt;border-bottom:2pt solid #000;padding-bottom:8pt;margin-bottom:14pt}
+  .print-head h1{font-size:18pt}
+  .print-head .meta{margin-left:auto;text-align:right;color:#000}
+  .print-sec{margin-bottom:16pt;break-inside:avoid}
+  .print-sec h2{font-size:13pt;border-bottom:1pt solid #999;padding-bottom:4pt;margin-bottom:8pt}
+  .print-stats{display:flex;gap:24pt;margin-bottom:12pt}
+  .print-stats div{border:1pt solid #999;padding:8pt 12pt}
+  .print-stats b{display:block;font-size:20pt;line-height:1}
+  .print-tbl{width:100%;font-size:10pt}
+  .print-tbl th{text-align:left;border-bottom:1pt solid #000;padding:4pt 6pt;font-size:9pt;text-transform:uppercase}
+  .print-tbl td{border-bottom:.5pt solid #ccc;padding:4pt 6pt}
+  .print-foot{margin-top:18pt;padding-top:8pt;border-top:1pt solid #999;font-size:9pt;color:#333}
+  .chart{max-width:100%}
+  tr,.print-sec{page-break-inside:avoid}
+}
+
+/* ===== Responsive ======================================================= */
+@media (max-width:1200px){
+  .grid--home{grid-template-columns:minmax(0,1fr)}
+  .carousel{grid-template-columns:minmax(0,1fr)}
+  :root{--fs-hero:3rem}
+}
+/* Settings gear lives in the top bar on small screens only — six tabs is the
+   practical limit at 390px, and Patient view keeps the sixth slot. */
+#topbar-settings{display:none}
+
+@media (max-width:900px){
+  .sidenav{display:none}
+  .tabbar{display:block}
+  .topbar{flex-wrap:wrap}
+  #patient-seg{order:4;width:100%}
+  .topbar__spacer{order:2}
+  .demo-badge{order:3}
+  #topbar-settings{display:inline-flex;order:3;min-height:var(--tap);padding:0 var(--sp-3)}
+  .main{padding:var(--sp-5) var(--sp-4) var(--sp-6)}
+  .topbar{padding:var(--sp-3) var(--sp-4);gap:var(--sp-3)}
+  .lockup .wordmark{display:none}       /* collapsed nav: mark alone */
+  .grid--2,.grid--3{grid-template-columns:minmax(0,1fr)}
+  .hero{grid-template-columns:minmax(0,1fr)}
+  .demo-fab{bottom:calc(var(--sp-4) + 72px)}
+  .demo-panel{bottom:calc(var(--sp-4) + 72px + var(--tap) + var(--sp-2));right:var(--sp-4)}
+  .slab{padding:var(--sp-5)}
+  .panel{padding:var(--sp-4)}
+  .panel__head,.panel__body{padding:var(--sp-4)}
+  .tbl td:first-child,.tbl th:first-child{padding-left:var(--sp-4)}
+  .tbl td:last-child,.tbl th:last-child{padding-right:var(--sp-4)}
+}
+@media (max-width:520px){
+  :root{--fs-hero:2.5rem;--fs-data:2.25rem;--fs-xl:1.625rem}
+  .demo-btns--split,.demo-btns--three{grid-template-columns:1fr}
+  .attn__item{padding:var(--sp-4)}
+  .pv{font-size:1.375rem}
+  .pv__banner,.pv__card{padding:var(--sp-5)}
+  .seg{width:100%}
+  .seg__btn{flex:1}
+}
+
+/* ===== Reduced motion ===================================================
+   Motion in this app only ever explains a change, so under reduced-motion the
+   change still happens — instantly — and nothing is lost.
+   ======================================================================== */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.001ms !important;animation-iteration-count:1 !important;transition-duration:.001ms !important;scroll-behavior:auto !important}
+  .pulse-dot{animation:none;opacity:1}
+  .scan__beam{animation:none;top:49%}
+  .carousel__ring{transition:none}
+}
+</style>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to main content</a>
+
+<div class="app">
+
+  <header class="topbar">
+    <a class="lockup" href="#/home" aria-label="Dose Logic — go to Home">
+      <span id="brand-mark" aria-hidden="true"></span>
+      <span class="wordmark">Dose Logic</span>
+    </a>
+
+    <div class="seg no-print" role="group" aria-label="Select patient" id="patient-seg"></div>
+
+    <span class="topbar__spacer"></span>
+    <p class="demo-badge no-print">Demo — simulated data</p>
+    <button class="btn btn--secondary no-print" id="topbar-settings" type="button" data-go="settings"></button>
+  </header>
+
+  <div class="shell">
+
+    <nav class="sidenav no-print" aria-label="Main">
+      <div class="sidenav__group">
+        <p class="label" id="nav-care-label">Care</p>
+        <ul aria-labelledby="nav-care-label" id="nav-primary"></ul>
+      </div>
+      <div class="sidenav__group">
+        <p class="label" id="nav-alt-label">Other views</p>
+        <ul aria-labelledby="nav-alt-label" id="nav-secondary"></ul>
+      </div>
+    </nav>
+
+    <main class="main" id="main" tabindex="-1">
+      <!-- Every screen lives in the DOM; the router toggles [hidden]. -->
+      <div id="app-views">
+        <section class="view" id="view-home"       aria-labelledby="h-home"></section>
+        <section class="view" id="view-schedule"   aria-labelledby="h-schedule"   hidden></section>
+        <section class="view" id="view-cartridges" aria-labelledby="h-cartridges" hidden></section>
+        <section class="view" id="view-history"    aria-labelledby="h-history"    hidden></section>
+        <section class="view" id="view-alerts"     aria-labelledby="h-alerts"     hidden></section>
+        <section class="view" id="view-settings"   aria-labelledby="h-settings"   hidden></section>
+        <section class="view" id="view-patient"    aria-labelledby="h-patient"    hidden></section>
+      </div>
+
+      <!-- Print-only summary. Populated on demand by "Export summary". -->
+      <div id="print-only"></div>
+    </main>
+
+  </div>
+
+  <nav class="tabbar no-print" aria-label="Main">
+    <ul class="tabbar__list" id="nav-tabs"></ul>
+  </nav>
+</div>
+
+<!-- Demo controls: one button, always reachable, collapsed by default. -->
+<button class="demo-fab no-print" id="demo-fab" type="button"
+        aria-expanded="false" aria-controls="demo-panel">
+  <span id="demo-fab-icon" aria-hidden="true"></span>
+  <span>Demo controls</span>
+</button>
+
+<aside class="demo-panel no-print" id="demo-panel" aria-labelledby="demo-panel-title" hidden>
+  <div class="demo-panel__head">
+    <h2 id="demo-panel-title">Demo controls</h2>
+    <button class="btn btn--sm btn--onink" type="button" id="demo-close">Hide</button>
+  </div>
+  <div class="demo-panel__body" id="demo-body"></div>
+</aside>
+
+<div class="toasts no-print" id="toasts"></div>
+
+<!-- Live regions: state changes fired by the simulator are not user-initiated,
+     so they have to be announced. -->
+<p class="sr-only" id="live-polite" role="status" aria-live="polite"></p>
+<p class="sr-only" id="live-assertive" role="alert" aria-live="assertive"></p>
+
+<div class="modal no-print" id="modal" hidden role="dialog" aria-modal="true" aria-labelledby="modal-title">
+  <div class="modal__scrim" id="modal-scrim"></div>
+  <div class="modal__box">
+    <div class="modal__head">
+      <h2 id="modal-title">Dialog</h2>
+      <button class="btn btn--sm btn--secondary" type="button" id="modal-close" aria-label="Close dialog">Close</button>
+    </div>
+    <div class="modal__body" id="modal-body"></div>
+    <div class="modal__foot" id="modal-foot"></div>
+  </div>
+</div>
+
+<script>
+/* ==========================================================================
+   DATA LAYER  (this was data.js — kept as one fenced section so the seam
+   survives being inlined into a single file)
+
+   HOW TO SWAP THIS FOR FIREBASE
+   -----------------------------
+   Nothing outside this section reads DL_DATA directly. Every read in the app
+   goes through the accessor layer at the bottom of this block — getPatients(),
+   getMedications(), getDoseLog(), getCartridges(), getDevice(), getAlerts(),
+   lookupNDC(). To go live, rewrite only those functions to return Firestore
+   documents (or promises, if you also make the render path async) and delete
+   the seed builders above them. No view code changes.
+
+   Everything here is fictional. No real patients, prescribers, or facilities.
+   ========================================================================== */
+(function (global) {
+  'use strict';
+
+  /* Deterministic PRNG. A seeded generator matters here because the adherence
+     figures are quoted in the UI ("87%") — an unseeded Math.random would make
+     the headline number drift on every refresh and contradict the copy. */
+  function mulberry32(seed) {
+    return function () {
+      seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+      var t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+
+  var MS_MIN = 60000, MS_HOUR = 3600000, MS_DAY = 86400000;
+
+  /* Dose window rules, in minutes after the scheduled time. These are the
+     thresholds the ESP32 firmware uses too — keep them in sync with it. */
+  var WINDOW = { dueFor: 30, lateAfter: 30, missedAfter: 120 };
+
+  function ymd(d) {
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') +
+           '-' + String(d.getDate()).padStart(2, '0');
+  }
+  function atTime(dateObj, hhmm) {
+    var p = hhmm.split(':');
+    var d = new Date(dateObj);
+    d.setHours(+p[0], +p[1], 0, 0);
+    return d.getTime();
+  }
+
+  /* ---- Patients -------------------------------------------------------- */
+  var patients = [
+    { id:'p1', name:'Margaret Ellison', age:78, pronouns:'she/her',
+      living:'Lives alone', relationship:'Mother',
+      seed:20260101, target:'~87% adherence' },
+    { id:'p2', name:'Robert Chen', age:71, pronouns:'he/him',
+      living:'Lives with spouse', relationship:'Father-in-law',
+      seed:70707070, target:'~98% adherence' },
+    { id:'p3', name:'Doris Whitfield', age:84, pronouns:'she/her',
+      living:'Assisted living', relationship:'Aunt',
+      seed:31415926, target:'~62% adherence' }
+  ];
+
+  /* ---- Medications ----------------------------------------------------- */
+  /* cartridge = physical carousel position 0-7. Fictional generics. */
+  var medications = [
+    // Margaret — 6 meds across 4 daily dose times, carts 6 and 7 left empty
+    { id:'m1', patientId:'p1', name:'Lisinopril',    strength:'10 mg',  form:'tablet', cartridge:0, times:['08:00'],          qty:1, startDate:'2025-11-04', endDate:null },
+    { id:'m2', patientId:'p1', name:'Metformin',     strength:'500 mg', form:'tablet', cartridge:1, times:['08:00','18:00'], qty:1, startDate:'2025-09-18', endDate:null },
+    { id:'m3', patientId:'p1', name:'Atorvastatin',  strength:'20 mg',  form:'tablet', cartridge:2, times:['21:00'],          qty:1, startDate:'2026-01-12', endDate:null },
+    { id:'m4', patientId:'p1', name:'Levothyroxine', strength:'50 mcg', form:'tablet', cartridge:3, times:['08:00'],          qty:1, startDate:'2025-06-02', endDate:null },
+    { id:'m5', patientId:'p1', name:'Amlodipine',    strength:'5 mg',   form:'tablet', cartridge:4, times:['12:30'],          qty:1, startDate:'2026-03-09', endDate:null },
+    { id:'m6', patientId:'p1', name:'Donepezil',     strength:'10 mg',  form:'tablet', cartridge:5, times:['21:00'],          qty:1, startDate:'2026-02-20', endDate:null },
+
+    // Robert — the happy path
+    { id:'m7',  patientId:'p2', name:'Metoprolol',   strength:'25 mg',   form:'tablet', cartridge:0, times:['08:00','20:00'], qty:1, startDate:'2025-08-01', endDate:null },
+    { id:'m8',  patientId:'p2', name:'Aspirin',      strength:'81 mg',   form:'tablet', cartridge:1, times:['08:00'],         qty:1, startDate:'2025-08-01', endDate:null },
+    { id:'m9',  patientId:'p2', name:'Rosuvastatin', strength:'10 mg',   form:'tablet', cartridge:2, times:['20:00'],         qty:1, startDate:'2025-10-15', endDate:null },
+    { id:'m10', patientId:'p2', name:'Cholecalciferol', strength:'1000 IU', form:'tablet', cartridge:3, times:['08:00'],      qty:1, startDate:'2025-08-01', endDate:null },
+
+    // Doris — evening doses are the problem, and the data has to show it
+    { id:'m11', patientId:'p3', name:'Sertraline',   strength:'50 mg',  form:'tablet', cartridge:0, times:['09:00'],          qty:1, startDate:'2025-07-22', endDate:null },
+    { id:'m12', patientId:'p3', name:'Furosemide',   strength:'20 mg',  form:'tablet', cartridge:1, times:['09:00','13:00'], qty:1, startDate:'2025-12-01', endDate:null },
+    { id:'m13', patientId:'p3', name:'Memantine',    strength:'10 mg',  form:'tablet', cartridge:2, times:['09:00','19:30'], qty:1, startDate:'2026-04-06', endDate:null },
+    { id:'m14', patientId:'p3', name:'Calcium carbonate', strength:'600 mg', form:'tablet', cartridge:3, times:['19:30'],     qty:1, startDate:'2025-07-22', endDate:null },
+    { id:'m15', patientId:'p3', name:'Melatonin',    strength:'3 mg',   form:'tablet', cartridge:4, times:['21:30'],          qty:1, startDate:'2026-05-30', endDate:null }
+  ];
+
+  /* ---- Cartridges ------------------------------------------------------ */
+  /* count comes from the load cell on the real unit. capacity is mechanical. */
+  var cartridges = [
+    { patientId:'p1', position:0, medId:'m1',  count:42, capacity:60 },
+    { patientId:'p1', position:1, medId:'m2',  count:58, capacity:60 },
+    { patientId:'p1', position:2, medId:'m3',  count:31, capacity:60 },
+    { patientId:'p1', position:3, medId:'m4',  count:5,  capacity:60 },   // deliberately low
+    { patientId:'p1', position:4, medId:'m5',  count:24, capacity:60 },
+    { patientId:'p1', position:5, medId:'m6',  count:19, capacity:60 },
+    { patientId:'p1', position:6, medId:null,  count:0,  capacity:60 },
+    { patientId:'p1', position:7, medId:null,  count:0,  capacity:60 },
+
+    { patientId:'p2', position:0, medId:'m7',  count:44, capacity:60 },
+    { patientId:'p2', position:1, medId:'m8',  count:51, capacity:60 },
+    { patientId:'p2', position:2, medId:'m9',  count:37, capacity:60 },
+    { patientId:'p2', position:3, medId:'m10', count:48, capacity:60 },
+    { patientId:'p2', position:4, medId:null,  count:0,  capacity:60 },
+    { patientId:'p2', position:5, medId:null,  count:0,  capacity:60 },
+    { patientId:'p2', position:6, medId:null,  count:0,  capacity:60 },
+    { patientId:'p2', position:7, medId:null,  count:0,  capacity:60 },
+
+    { patientId:'p3', position:0, medId:'m11', count:26, capacity:60 },
+    { patientId:'p3', position:1, medId:'m12', count:11, capacity:60 },
+    { patientId:'p3', position:2, medId:'m13', count:33, capacity:60 },
+    { patientId:'p3', position:3, medId:'m14', count:29, capacity:60 },
+    { patientId:'p3', position:4, medId:'m15', count:40, capacity:60 },
+    { patientId:'p3', position:5, medId:null,  count:0,  capacity:60 },
+    { patientId:'p3', position:6, medId:null,  count:0,  capacity:60 },
+    { patientId:'p3', position:7, medId:null,  count:0,  capacity:60 }
+  ];
+
+  /* ---- Devices --------------------------------------------------------- */
+  /* Doris's unit is offline on purpose: it gives the alert feed an urgent item
+     and explains why one of her doses is sitting in `due` rather than
+     dispensed. The two facts have to agree or the demo looks broken. */
+  var devices = {
+    p1:{ serial:'DL-0001-A7', online:true,  lastSyncOffsetMin:3,   firmware:'0.9.4', power:'AC adapter', battery:100, cupOccupied:true,  carouselIndex:4 },
+    p2:{ serial:'DL-0004-C2', online:true,  lastSyncOffsetMin:11,  firmware:'0.9.4', power:'AC adapter', battery:100, cupOccupied:false, carouselIndex:0 },
+    p3:{ serial:'DL-0009-B1', online:false, lastSyncOffsetMin:194, firmware:'0.9.2', power:'Battery',    battery:38,  cupOccupied:false, carouselIndex:2 }
+  };
+
+  /* ---- NDC lookup ------------------------------------------------------
+     Shaped exactly like the NLM RxNorm getNDCProperties payload so the live
+     swap is a fetch() with no reshaping. Labelers are invented. */
+  var ndcProperties = [
+    { ndcItem:'51672-4033-01', ndc9:'51672-4033', rxcui:'310798', splSetIdItem:'a1f0c2d4-0000-4a1b-9c00-demo00000001',
+      packagingList:{ packaging:['100 TABLET in 1 BOTTLE (51672-4033-01)'] },
+      propertyConceptList:{ propertyConcept:[
+        {propName:'LABELER',propValue:'Ashgrove Pharmaceuticals'},
+        {propName:'DOSAGE_FORM',propValue:'TABLET'},
+        {propName:'MARKETING_CATEGORY',propValue:'ANDA'},
+        {propName:'COLORTEXT',propValue:'peach'},
+        {propName:'SHAPE',propValue:'ROUND'}]},
+      _display:{ name:'Hydrochlorothiazide', strength:'25 mg', form:'tablet', packQty:100 }, source:'RxNorm' },
+
+    { ndcItem:'00378-1810-01', ndc9:'00378-1810', rxcui:'979492', splSetIdItem:'a1f0c2d4-0000-4a1b-9c00-demo00000002',
+      packagingList:{ packaging:['90 TABLET in 1 BOTTLE (00378-1810-01)'] },
+      propertyConceptList:{ propertyConcept:[
+        {propName:'LABELER',propValue:'Fenwick Laboratories'},
+        {propName:'DOSAGE_FORM',propValue:'TABLET'},
+        {propName:'MARKETING_CATEGORY',propValue:'ANDA'},
+        {propName:'COLORTEXT',propValue:'white'},
+        {propName:'SHAPE',propValue:'OVAL'}]},
+      _display:{ name:'Losartan potassium', strength:'50 mg', form:'tablet', packQty:90 }, source:'RxNorm' },
+
+    { ndcItem:'68180-0518-09', ndc9:'68180-0518', rxcui:'310431', splSetIdItem:'a1f0c2d4-0000-4a1b-9c00-demo00000003',
+      packagingList:{ packaging:['60 CAPSULE in 1 BOTTLE (68180-0518-09)'] },
+      propertyConceptList:{ propertyConcept:[
+        {propName:'LABELER',propValue:'Northline Generics'},
+        {propName:'DOSAGE_FORM',propValue:'CAPSULE'},
+        {propName:'MARKETING_CATEGORY',propValue:'ANDA'},
+        {propName:'COLORTEXT',propValue:'yellow'},
+        {propName:'SHAPE',propValue:'CAPSULE'}]},
+      _display:{ name:'Gabapentin', strength:'300 mg', form:'capsule', packQty:60 }, source:'RxNorm' },
+
+    { ndcItem:'62332-0146-31', ndc9:'62332-0146', rxcui:'312940', splSetIdItem:'a1f0c2d4-0000-4a1b-9c00-demo00000004',
+      packagingList:{ packaging:['30 TABLET in 1 BOTTLE (62332-0146-31)'] },
+      propertyConceptList:{ propertyConcept:[
+        {propName:'LABELER',propValue:'Halverson Pharma'},
+        {propName:'DOSAGE_FORM',propValue:'TABLET'},
+        {propName:'MARKETING_CATEGORY',propValue:'ANDA'},
+        {propName:'COLORTEXT',propValue:'light green'},
+        {propName:'SHAPE',propValue:'ROUND'}]},
+      _display:{ name:'Sertraline hydrochloride', strength:'25 mg', form:'tablet', packQty:30 }, source:'RxNorm' }
+  ];
+
+  /* The scanner walks this list in order and wraps. Position 3 is an NDC that
+     is deliberately absent from the table so the not-found path gets exercised
+     every fourth scan without anyone having to rig it live on stage. */
+  var scanSequence = ['51672-4033-01','00378-1810-01','99999-1234-56','68180-0518-09','62332-0146-31'];
+
+  /* ---- Dose-log generation --------------------------------------------- */
+  /* Per-dose outcome probabilities. Tuned so the 90-day adherence lands on the
+     figures the personas are described by: Margaret ~87, Robert ~98, Doris ~62
+     with evenings far worse than mornings. */
+  var PROFILE = {
+    p1: function(){ return { taken:.80, late:.05, missed:.13, skipped:.02 }; },
+    p2: function(){ return { taken:.950, late:.026, missed:.022, skipped:.002 }; },
+    p3: function(hhmm){
+      return (parseInt(hhmm,10) >= 15)
+        ? { taken:.33, late:.06, missed:.58, skipped:.03 }   // evening
+        : { taken:.70, late:.07, missed:.21, skipped:.02 };  // morning / midday
+    }
+  };
+
+  function pickOutcome(rand, p) {
+    var r = rand();
+    if (r < p.taken) return 'taken';
+    if (r < p.taken + p.late) return 'late';
+    if (r < p.taken + p.late + p.missed) return 'missed';
+    return 'skipped';
+  }
+
+  /* Today's board is hand-set rather than sampled, because the demo script
+     depends on specific states being on screen: Margaret has a pill sitting in
+     the cup, Doris has an undispensed dose because her unit is offline, and
+     between them all seven states are visible without touching a control. */
+  var todayOverrides = {
+    'p1|08:00|m1': { status:'taken', dispensedOffset:0,  pickupOffset:4 },
+    'p1|08:00|m2': { status:'taken', dispensedOffset:0,  pickupOffset:4 },
+    'p1|08:00|m4': { status:'late',  dispensedOffset:0,  pickupOffset:107 },
+    'p1|12:30|m5': { status:'dispensed_not_taken', dispensedOffset:0, pickupOffset:null },
+    'p2|08:00|m7': { status:'taken', dispensedOffset:0,  pickupOffset:2 },
+    'p2|08:00|m8': { status:'taken', dispensedOffset:0,  pickupOffset:2 },
+    'p2|08:00|m10':{ status:'taken', dispensedOffset:0,  pickupOffset:2 },
+    'p3|09:00|m11':{ status:'taken', dispensedOffset:0,  pickupOffset:12 },
+    'p3|09:00|m12':{ status:'missed',dispensedOffset:0,  pickupOffset:null },
+    'p3|09:00|m13':{ status:'late',  dispensedOffset:0,  pickupOffset:98 },
+    'p3|13:00|m12':{ status:'due',   dispensedOffset:null, pickupOffset:null },
+    'p3|21:30|m15':{ status:'skipped', dispensedOffset:null, pickupOffset:null }
+  };
+
+  /* Margaret's brief calls for a missed dose two days back specifically, so it
+     is pinned rather than left to the sampler. */
+  var historyOverrides = { 'p1|-2|21:00|m6': 'missed' };
+
+  function buildDoseLog(clockMs) {
+    var log = [];
+    var today = new Date(clockMs); today.setHours(0,0,0,0);
+
+    patients.forEach(function (pt) {
+      var rand = mulberry32(pt.seed);
+      var meds = medications.filter(function (m) { return m.patientId === pt.id; });
+
+      // -89 .. +3 days. The forward days exist so "jump time" has somewhere to
+      // land without regenerating (and wiping) simulator changes.
+      for (var off = -89; off <= 3; off++) {
+        var day = new Date(today.getTime() + off * MS_DAY);
+        var dayKey = ymd(day);
+
+        meds.forEach(function (med) {
+          if (med.startDate > dayKey) return;
+          if (med.endDate && med.endDate < dayKey) return;
+
+          med.times.forEach(function (t) {
+            var schedTs = atTime(day, t);
+            var entry = {
+              id: pt.id + '|' + dayKey + '|' + t + '|' + med.id,
+              patientId: pt.id, medId: med.id, cartridge: med.cartridge,
+              date: dayKey, scheduled: t, scheduledTs: schedTs,
+              dispensedTs: null, pickupTs: null, qty: med.qty, status: 'upcoming'
+            };
+
+            if (off < 0) {
+              var forced = historyOverrides[pt.id + '|' + off + '|' + t + '|' + med.id];
+              var st = forced || pickOutcome(rand, PROFILE[pt.id](t));
+              applyPastStatus(entry, st, rand);
+            } else if (off === 0) {
+              var ov = todayOverrides[pt.id + '|' + t + '|' + med.id];
+              if (ov) {
+                entry.status = ov.status;
+                if (ov.dispensedOffset !== null && ov.dispensedOffset !== undefined) {
+                  entry.dispensedTs = schedTs + ov.dispensedOffset * MS_MIN;
+                }
+                if (ov.pickupOffset !== null && ov.pickupOffset !== undefined) {
+                  entry.pickupTs = schedTs + ov.pickupOffset * MS_MIN;
+                }
+              } else if (schedTs > clockMs) {
+                entry.status = 'upcoming';
+              } else if (clockMs <= schedTs + WINDOW.dueFor * MS_MIN) {
+                entry.status = 'due';
+              } else {
+                applyPastStatus(entry, pickOutcome(rand, PROFILE[pt.id](t)), rand);
+              }
+            }
+            // off > 0 stays 'upcoming'
+
+            log.push(entry);
+          });
+        });
+      }
+    });
+
+    log.sort(function (a, b) { return a.scheduledTs - b.scheduledTs; });
+    return log;
+  }
+
+  /* Timestamps are derived from the status rather than the other way round, so
+     a dose can never claim it was picked up at a time that contradicts its
+     own state (e.g. a `late` pickup that lands inside the on-time window). */
+  function applyPastStatus(entry, status, rand) {
+    entry.status = status;
+    if (status === 'skipped') return;
+    entry.dispensedTs = entry.scheduledTs + Math.round(rand() * 2) * MS_MIN;
+    if (status === 'taken') {
+      entry.pickupTs = entry.dispensedTs + Math.round(1 + rand() * (WINDOW.lateAfter - 2)) * MS_MIN;
+    } else if (status === 'late') {
+      entry.pickupTs = entry.dispensedTs + Math.round(WINDOW.lateAfter + 4 + rand() * 85) * MS_MIN;
+    }
+  }
+
+  /* ---- Alerts ---------------------------------------------------------- */
+  /* offsetMin is minutes before the app clock, so the feed always reads as
+     "just now / this morning" no matter what day the demo happens on. */
+  var alerts = [
+    { id:'a1', patientId:'p1', severity:'warning', offsetMin:35,   read:false,
+      title:'Amlodipine is waiting in the cup',
+      what:'The dispenser released the 12:30 dose and it has not been picked up.',
+      action:'Call Margaret, or mark it skipped if she is out.' },
+    { id:'a2', patientId:'p3', severity:'urgent', offsetMin:194,  read:false,
+      title:'Dispenser is offline',
+      what:'DL-0009-B1 stopped reporting and has not synced since this morning.',
+      action:'Check the unit has power and is in Wi-Fi range.' },
+    { id:'a3', patientId:'p3', severity:'urgent', offsetMin:245,  read:false,
+      title:'Furosemide missed',
+      what:'The 09:00 dose window closed with no pickup.',
+      action:'Confirm with the care home before the 13:00 dose.' },
+    { id:'a4', patientId:'p1', severity:'informational', offsetMin:410, read:false,
+      title:'Levothyroxine cartridge is low',
+      what:'Cartridge 3 is down to 5 tablets.',
+      action:'Refill it, then log the refill so the estimate resets.' },
+    { id:'a5', patientId:'p3', severity:'warning', offsetMin:330,  read:true,
+      title:'Memantine taken late',
+      what:'The 09:00 dose was picked up outside the scheduled window.',
+      action:'No action needed. Worth watching if it repeats.' },
+    { id:'a6', patientId:'p1', severity:'warning', offsetMin:305,  read:true,
+      title:'Levothyroxine taken late',
+      what:'The 08:00 dose was picked up after the window closed.',
+      action:'No action needed.' },
+    { id:'a7', patientId:'p1', severity:'urgent', offsetMin:2880, read:true,
+      title:'Donepezil missed',
+      what:'The 21:00 dose two days ago was dispensed and never picked up.',
+      action:'Ask whether the evening reminder is loud enough.' },
+    { id:'a8', patientId:'p3', severity:'informational', offsetMin:600, read:true,
+      title:'Dispenser switched to battery',
+      what:'DL-0009-B1 reported a loss of AC power.',
+      action:'Plug the unit back in.' },
+    { id:'a9', patientId:'p2', severity:'informational', offsetMin:1500, read:true,
+      title:'Weekly summary is ready',
+      what:'Robert had a full week with no missed doses.',
+      action:'Open History to review or print it.' },
+    { id:'a10', patientId:'p1', severity:'informational', offsetMin:4320, read:true,
+      title:'Schedule change synced',
+      what:'Amlodipine 5 mg was added to cartridge 4 and the device confirmed it.',
+      action:'No action needed.' }
+  ];
+
+  /* ---- Settings -------------------------------------------------------- */
+  var settings = {
+    escalation: { nudgePatient:15, notifyPrimary:60, notifySecondary:120 },
+    triggers: { doseMissed:true, doseLate:true, waitingInCup:true, cartridgeLow:true, deviceOffline:true, weeklySummary:false },
+    quietHours: { enabled:true, start:'22:00', end:'07:00' },
+    contacts: [
+      { id:'c1', name:'You (primary caregiver)', role:'Primary', contact:'Push + SMS', locked:true },
+      { id:'c2', name:'Alan Ellison',  role:'Secondary', contact:'SMS' },
+      { id:'c3', name:'Rosewood Home Care', role:'Care agency', contact:'Email' }
+    ]
+  };
+
+  /* ======================================================================
+     ACCESSOR LAYER — the only thing the app is allowed to call.
+     Replace these bodies with Firestore queries to go live.
+     ====================================================================== */
+  var DB = {
+    patients: patients,
+    medications: medications,
+    cartridges: cartridges,
+    devices: devices,
+    alerts: alerts,
+    settings: settings,
+    ndcProperties: ndcProperties,
+    scanSequence: scanSequence,
+    doseLog: [],
+    WINDOW: WINDOW,
+    MS: { MIN: MS_MIN, HOUR: MS_HOUR, DAY: MS_DAY },
+
+    // Seeded at boot because the 90-day window is relative to the app clock.
+    seedDoseLog: function (clockMs) { this.doseLog = buildDoseLog(clockMs); return this.doseLog; },
+    rebuild:     function (clockMs) { return this.seedDoseLog(clockMs); },
+
+    getPatients:    function () { return this.patients.slice(); },
+    getPatient:     function (id) { return this.patients.filter(function(p){return p.id===id;})[0] || null; },
+    getMedications: function (pid) { return this.medications.filter(function(m){return m.patientId===pid;}); },
+    getMedication:  function (id) { return this.medications.filter(function(m){return m.id===id;})[0] || null; },
+    getCartridges:  function (pid) { return this.cartridges.filter(function(c){return c.patientId===pid;})
+                                        .sort(function(a,b){return a.position-b.position;}); },
+    getCartridge:   function (pid,pos){ return this.cartridges.filter(function(c){return c.patientId===pid&&c.position===pos;})[0]||null; },
+    getDevice:      function (pid) { return this.devices[pid] || null; },
+    getAlerts:      function (pid) { return pid ? this.alerts.filter(function(a){return a.patientId===pid;}) : this.alerts.slice(); },
+    getSettings:    function () { return this.settings; },
+
+    getDoseLog: function (pid, dateKey) {
+      return this.doseLog.filter(function (d) {
+        return d.patientId === pid && (!dateKey || d.date === dateKey);
+      });
+    },
+    getDoseLogRange: function (pid, fromTs, toTs) {
+      return this.doseLog.filter(function (d) {
+        return d.patientId === pid && d.scheduledTs >= fromTs && d.scheduledTs <= toTs;
+      });
+    },
+    getDose: function (id) {
+      return this.doseLog.filter(function (d) { return d.id === id; })[0] || null;
+    },
+
+    /* Returns the getNDCProperties envelope, not a bare object, so the live
+       version can hand back response.json() untouched. */
+    lookupNDC: function (code) {
+      var hit = this.ndcProperties.filter(function (n) { return n.ndcItem === code; });
+      return hit.length ? { ndcPropertyList: { ndcProperty: hit } } : { ndcPropertyList: null };
+    }
+  };
+
+  global.DL_DATA = DB;
+})(window);
+</script>
+
+<script>
+/* ==========================================================================
+   APP  (this was app.js)
+   State, rendering, event handling, and the demo simulator.
+   Reads go through DL_DATA's accessor layer only — see the data block above.
+   ========================================================================== */
+(function () {
+  'use strict';
+
+  var DB = window.DL_DATA;
+  var MS_MIN = DB.MS.MIN, MS_HOUR = DB.MS.HOUR, MS_DAY = DB.MS.DAY;
+  var WINDOW_RULES = DB.WINDOW;
+
+  /* ---------------------------------------------------------------- state */
+  /* The clock is a variable, never Date.now() read at the point of use, so
+     "jump time forward" moves the whole app and not just one widget. */
+  function bootClock() {
+    var d = new Date();
+    d.setHours(13, 5, 0, 0);   // fixed demo hour: the board is staged for 13:05
+    return d.getTime();
+  }
+
+  var INITIAL_CLOCK = bootClock();
+
+  var state = {
+    clockMs: INITIAL_CLOCK,
+    patientId: 'p1',
+    view: 'home',
+    historyRange: 30,
+    historyDetailId: null,
+    selectedCartridge: 4,
+    demoOpen: false,
+    scanIndex: 0,
+    editingMedId: null,
+    prefill: null,
+    formError: null,
+    syncing: false,
+    carouselSpin: 0
+  };
+
+  function now() { return state.clockMs; }
+
+  /* ------------------------------------------------------------- utilities */
+  function $(sel, root) { return (root || document).querySelector(sel); }
+  function $$(sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); }
+
+  /* Medication names are typed by the user in the add form, so everything that
+     reaches innerHTML is escaped rather than trusted. */
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  function ymd(ts) {
+    var d = new Date(ts);
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') +
+           '-' + String(d.getDate()).padStart(2, '0');
+  }
+  function startOfDay(ts) { var d = new Date(ts); d.setHours(0,0,0,0); return d.getTime(); }
+
+  function fmtClock(ts) {
+    if (ts == null) return '—';
+    var d = new Date(ts), h = d.getHours(), m = d.getMinutes();
+    var ap = h >= 12 ? 'PM' : 'AM';
+    h = h % 12; if (h === 0) h = 12;
+    return h + ':' + String(m).padStart(2, '0') + ' ' + ap;
+  }
+  function fmtHHMM(hhmm) {
+    var p = hhmm.split(':'), h = +p[0], ap = h >= 12 ? 'PM' : 'AM';
+    h = h % 12; if (h === 0) h = 12;
+    return h + ':' + p[1] + ' ' + ap;
+  }
+  function fmtDate(ts) {
+    var d = new Date(ts);
+    var days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    var mon = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return days[d.getDay()] + ', ' + mon[d.getMonth()] + ' ' + d.getDate();
+  }
+  function fmtLongDate(ts) {
+    var d = new Date(ts);
+    var mon = ['January','February','March','April','May','June','July',
+               'August','September','October','November','December'];
+    return mon[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear();
+  }
+  /* Duration phrasing is deliberately coarse — a caregiver glancing at a hero
+     number wants "in 4h 55m", not a live-ticking second count. */
+  function fmtDuration(ms) {
+    var mins = Math.round(Math.abs(ms) / MS_MIN);
+    if (mins < 1) return 'now';
+    if (mins < 60) return mins + ' min';
+    var h = Math.floor(mins / 60), m = mins % 60;
+    if (h < 24) return m ? h + 'h ' + m + 'm' : h + 'h';
+    var d = Math.floor(h / 24);
+    return d + (d === 1 ? ' day' : ' days');
+  }
+  function fmtAgo(ts) {
+    var delta = now() - ts;
+    if (delta < 0) return 'in ' + fmtDuration(delta);
+    if (delta < MS_MIN) return 'just now';
+    return fmtDuration(delta) + ' ago';
+  }
+  function pct(n) { return Math.round(n * 100); }
+
+  /* ------------------------------------------------------------------ icons */
+  function svg(body, size, extra) {
+    return '<svg class="' + (extra || '') + '" width="' + size + '" height="' + size +
+           '" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" ' +
+           'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' +
+           body + '</svg>';
+  }
+
+  var ICONS = {
+    home:       '<path d="M2.5 6.8 8 2.4l5.5 4.4V13a.6.6 0 0 1-.6.6H9.6V10H6.4v3.6H3.1a.6.6 0 0 1-.6-.6Z"/>',
+    schedule:   '<path d="M2.4 4h11.2M2.4 8h11.2M2.4 12h7.2"/>',
+    cartridges: '<circle cx="8" cy="8" r="5.9"/><path d="M8 8V2.1M8 8l4.2-4.2M8 8h5.9M8 8l4.2 4.2M8 8v5.9M8 8l-4.2 4.2M8 8H2.1M8 8 3.8 3.8"/>',
+    history:    '<path d="M2.2 13.4h11.6M4.2 13.4V8.6M7.4 13.4V5M10.6 13.4v-3M13.4 13.4V6.6"/>',
+    alerts:     '<path d="M8 2.2a3.9 3.9 0 0 0-3.9 3.9c0 3.3-1.3 4.4-1.3 4.4h10.4s-1.3-1.1-1.3-4.4A3.9 3.9 0 0 0 8 2.2Z"/><path d="M6.6 12.9a1.6 1.6 0 0 0 2.8 0"/>',
+    settings:   '<path d="M2.4 4.6h4M9.4 4.6h4.2M2.4 11.4h2.2M7.6 11.4h6"/><circle cx="7.7" cy="4.6" r="1.7"/><circle cx="6" cy="11.4" r="1.7"/>',
+    patient:    '<circle cx="8" cy="5.4" r="2.7"/><path d="M2.9 13.6a5.1 5.1 0 0 1 10.2 0"/>',
+    plus:       '<path d="M8 3.2v9.6M3.2 8h9.6"/>',
+    scan:       '<path d="M2.4 5.6V3.4a1 1 0 0 1 1-1h2.2M10.4 2.4h2.2a1 1 0 0 1 1 1v2.2M13.6 10.4v2.2a1 1 0 0 1-1 1h-2.2M5.6 13.6H3.4a1 1 0 0 1-1-1v-2.2"/><path d="M2.4 8h11.2"/>',
+    print:      '<path d="M4.4 6.2V2.6h7.2v3.6"/><path d="M4.4 11.6H3a1 1 0 0 1-1-1V7.2a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v3.4a1 1 0 0 1-1 1h-1.4"/><path d="M4.4 9.6h7.2v3.8H4.4z"/>',
+    refill:     '<path d="M13.2 8a5.2 5.2 0 1 1-1.6-3.7"/><path d="M13.4 2.6v3.2h-3.2"/>',
+    close:      '<path d="M3.8 3.8l8.4 8.4M12.2 3.8l-8.4 8.4"/>',
+    chevron:    '<path d="M6 3.6 10.4 8 6 12.4"/>',
+    back:       '<path d="M10 3.6 5.6 8 10 12.4"/>',
+    sliders:    '<path d="M2.4 4.6h4M9.4 4.6h4.2M2.4 11.4h2.2M7.6 11.4h6"/><circle cx="7.7" cy="4.6" r="1.7"/><circle cx="6" cy="11.4" r="1.7"/>',
+    info:       '<circle cx="8" cy="8" r="5.9"/><path d="M8 7.4v3.4M8 5.2h.01"/>',
+    warning:    '<path d="M8 2.6 14 12.8H2Z"/><path d="M8 6.6v2.8M8 11.2h.01"/>',
+    urgent:     '<circle cx="8" cy="8" r="5.9" stroke-width="2"/><path d="M8 4.8v3.6M8 10.8h.01" stroke-width="2"/>',
+    device:     '<rect x="3.4" y="2.4" width="9.2" height="11.2" rx="1.4"/><path d="M6 5.4h4M6 8h4"/><circle cx="8" cy="11" r="1"/>',
+    cup:        '<path d="M4 5.4h8l-.9 7.2a1 1 0 0 1-1 .9H5.9a1 1 0 0 1-1-.9Z"/>'
+  };
+
+  /* Status icons are shape-first: each state is identifiable with the colour
+     stripped out, which is the whole point of the fill-not-hue rule. */
+  var STATUS_ICONS = {
+    upcoming:            '<circle cx="8" cy="8" r="5"/>',
+    due:                 '<circle cx="8" cy="8" r="5"/><circle cx="8" cy="8" r="1.8" fill="currentColor" stroke="none"/>',
+    dispensed_not_taken: '<path d="M8 1.8v5.6M5.6 5.4 8 7.8l2.4-2.4"/><path d="M3.4 9h9.2l-.8 4.4a1 1 0 0 1-1 .8H5.2a1 1 0 0 1-1-.8Z"/>',
+    taken:               '<path d="M3 8.4 6.4 11.8 13 5.2" stroke-width="2.1"/>',
+    late:                '<circle cx="8" cy="8" r="5.6"/><path d="M8 4.8V8l2.2 1.5"/>',
+    missed:              '<path d="M4.2 4.2 11.8 11.8M11.8 4.2 4.2 11.8" stroke-width="2.1"/>',
+    skipped:             '<path d="M3.6 8h8.8" stroke-width="2.1"/>'
+  };
+
+  var STATUS_LABEL = {
+    upcoming:'Upcoming', due:'Due now', dispensed_not_taken:'In the cup',
+    taken:'Taken', late:'Late', missed:'Missed', skipped:'Skipped'
+  };
+  /* Spoken labels carry the meaning the colour and shape carry visually. */
+  var STATUS_SR = {
+    upcoming:'Upcoming, not due yet',
+    due:'Due now, not yet dispensed',
+    dispensed_not_taken:'Dispensed and still waiting in the cup — needs attention',
+    taken:'Taken on time', late:'Taken late', missed:'Missed',
+    skipped:'Skipped by caregiver'
+  };
+
+  function icon(name, size) { return svg(ICONS[name] || '', size || 18); }
+  function statusIcon(status, size) {
+    return svg(STATUS_ICONS[status] || '', size || 15, 'chip__icon');
+  }
+
+  function chip(status, opts) {
+    opts = opts || {};
+    var pulse = status === 'dispensed_not_taken' && !opts.noPulse
+      ? '<span class="pulse-dot" aria-hidden="true"></span>' : '';
+    return '<span class="chip chip--' + status + '">' +
+             statusIcon(status, opts.iconSize) + pulse +
+             '<span class="chip__label">' + esc(opts.label || STATUS_LABEL[status]) + '</span>' +
+             '<span class="sr-only">. ' + esc(STATUS_SR[status]) + '</span>' +
+           '</span>';
+  }
+
+  /* -------------------------------------------------------------- the mark */
+  /* One function, one place to swap when the real logo file lands.
+     Geometry is literal: 8 wedges at 45 degrees, matching the carousel's
+     45-degrees-per-position indexing, filled wedge parked at 12 o'clock which
+     is the dispense position over the chute. */
+  function logoMark(size, opts) {
+    opts = opts || {};
+    var cx = 32, cy = 32, r = 26;
+    function pt(deg) {
+      var a = deg * Math.PI / 180;
+      return [(cx + r * Math.cos(a)).toFixed(2), (cy + r * Math.sin(a)).toFixed(2)];
+    }
+    var spokes = '';
+    for (var i = 0; i < 8; i++) {
+      var p = pt(-112.5 + i * 45);
+      spokes += 'M32 32L' + p[0] + ' ' + p[1];
+    }
+    var a1 = pt(-112.5), a2 = pt(-67.5);
+    var wedge = 'M32 32L' + a1[0] + ' ' + a1[1] + 'A26 26 0 0 1 ' + a2[0] + ' ' + a2[1] + 'Z';
+
+    // The chute reads as a slot cut through the active wedge. Below 32px it is
+    // noise, so it is dropped rather than smeared.
+    var chute = size >= 32
+      ? '<path d="M32 12.4V24.2" stroke="var(--dl-card)" stroke-width="2.6" stroke-linecap="round"/>'
+      : '';
+    var sw = size <= 20 ? 3.4 : 2.6;   // thicken strokes so the mark holds at 16px
+
+    return '<svg class="dl-mark' + (opts.stepping ? ' dl-mark--stepping' : '') + '" width="' + size +
+           '" height="' + size + '" viewBox="0 0 64 64" aria-hidden="true" focusable="false">' +
+           '<circle cx="32" cy="32" r="26" fill="var(--dl-card)"/>' +
+           '<path d="' + wedge + '" fill="var(--dl-red)"/>' + chute +
+           '<g stroke="var(--dl-ink)" stroke-width="' + sw + '" fill="none" stroke-linecap="round">' +
+             '<circle cx="32" cy="32" r="26"/><path d="' + spokes + '"/>' +
+           '</g></svg>';
+  }
+
+  /* ==================================================================
+     DERIVED DATA
+     Nothing below stores anything — every figure on screen is computed
+     from the dose log so a simulated change cannot leave a stale number
+     behind on some other screen.
+     ================================================================== */
+
+  /* Stable pseudo-random from a dose id. Used when the clock jumps past an
+     open dose: the outcome has to be plausible but must not change if the
+     same jump is replayed, or the demo would contradict itself. */
+  function hashRand(str) {
+    var h = 2166136261;
+    for (var i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+    return ((h >>> 0) % 100000) / 100000;
+  }
+
+  function windowClosed(dose, at) { return (at || now()) > dose.scheduledTs + WINDOW_RULES.missedAfter * MS_MIN; }
+
+  /* Mirrors the firmware's timeout behaviour. Called on every commit so that
+     jumping the clock forward produces the same outcomes the device would. */
+  function resolveClock() {
+    var t = now(), fired = [];
+    DB.doseLog.forEach(function (d) {
+      if (d.scheduledTs > t) return;
+
+      if (d.status === 'upcoming' && t <= d.scheduledTs + WINDOW_RULES.dueFor * MS_MIN) {
+        d.status = 'due';
+        return;
+      }
+      if (!windowClosed(d, t)) return;
+
+      if (d.status === 'dispensed_not_taken') {
+        // The pill sat in the cup until the window closed. That is a miss, and
+        // it is the honest outcome to show when the clock is jumped forward.
+        d.status = 'missed';
+        syncCupState(d.patientId);
+        fired.push(d);
+      } else if (d.status === 'upcoming' || d.status === 'due') {
+        var r = hashRand(d.id), p = r < 0.80 ? 'taken' : (r < 0.87 ? 'late' : 'missed');
+        d.status = p;
+        d.dispensedTs = d.scheduledTs + MS_MIN;
+        if (p === 'taken') d.pickupTs = d.dispensedTs + Math.round(2 + r * 20) * MS_MIN;
+        if (p === 'late')  d.pickupTs = d.dispensedTs + Math.round(40 + r * 60) * MS_MIN;
+        consumeFromCartridge(d.patientId, d.cartridge, d.qty);
+        if (p === 'missed') fired.push(d);
+      }
+    });
+
+    fired.forEach(function (d) {
+      var med = DB.getMedication(d.medId);
+      pushAlert(d.patientId, 'urgent', (med ? med.name : 'Dose') + ' missed',
+        'The ' + fmtHHMM(d.scheduled) + ' dose window closed with no pickup.',
+        'Check on ' + firstName(d.patientId) + ' and consider adjusting the reminder.');
+    });
+  }
+
+  function firstName(pid) {
+    var p = DB.getPatient(pid);
+    return p ? p.name.split(' ')[0] : 'the patient';
+  }
+
+  function consumeFromCartridge(pid, pos, qty) {
+    var c = DB.getCartridge(pid, pos);
+    if (c) c.count = Math.max(0, c.count - (qty || 1));
+  }
+
+  /* Cup occupancy is derived, never toggled by hand: the load cell reports mass
+     in the cup, so clearing one pill while another is still sitting there must
+     not report the cup as empty. */
+  function syncCupState(pid) {
+    var dev = DB.getDevice(pid);
+    if (!dev) return;
+    dev.cupOccupied = DB.getDoseLog(pid).some(function (d) {
+      return d.status === 'dispensed_not_taken';
+    });
+  }
+
+  function todayDoses(pid) {
+    return DB.getDoseLog(pid, ymd(now()))
+             .sort(function (a, b) { return a.scheduledTs - b.scheduledTs; });
+  }
+
+  /* The hero is a dose *slot*, not a single pill — Margaret takes three things
+     at 08:00 and showing them as three separate "next dose" cards would bury
+     the one thing the caregiver needs to know. */
+  function nextSlot(pid) {
+    var open = DB.getDoseLog(pid).filter(function (d) {
+      return (d.status === 'upcoming' || d.status === 'due') && d.scheduledTs >= now() - WINDOW_RULES.missedAfter * MS_MIN;
+    }).sort(function (a, b) { return a.scheduledTs - b.scheduledTs; });
+    if (!open.length) return null;
+    var ts = open[0].scheduledTs;
+    return { ts: ts, doses: open.filter(function (d) { return d.scheduledTs === ts; }) };
+  }
+
+  /* The strip is a to-do list, not a history feed. Anything still in the cup
+     always surfaces — it is the one state only our hardware can detect and it
+     must never be pushed down the page by yesterday's misses. Misses older
+     than a day are still real, but they are no longer actionable today, so
+     they collapse into a single line pointing at History. */
+  function attentionItems(pid) {
+    var t = now();
+    var cup = DB.getDoseLog(pid).filter(function (d) { return d.status === 'dispensed_not_taken'; });
+    var freshMiss = DB.getDoseLog(pid).filter(function (d) {
+      return d.status === 'missed' && (t - d.scheduledTs) < MS_DAY;
+    });
+    var olderMiss = DB.getDoseLog(pid).filter(function (d) {
+      return d.status === 'missed' && (t - d.scheduledTs) >= MS_DAY && (t - d.scheduledTs) < 7 * MS_DAY;
+    });
+    function newestFirst(a, b) { return b.scheduledTs - a.scheduledTs; }
+    return {
+      rows: cup.sort(newestFirst).concat(freshMiss.sort(newestFirst)),
+      olderMissed: olderMiss.length
+    };
+  }
+
+  /* Adherence counts only doses whose window has actually closed. Including
+     tonight's not-yet-due pills would drag the number down all day and make it
+     look like the patient is failing when nothing has happened yet. */
+  function adherenceStats(pid, fromTs, toTs) {
+    var s = { taken:0, late:0, missed:0, skipped:0, resolved:0, rate:0 };
+    DB.getDoseLogRange(pid, fromTs, toTs).forEach(function (d) {
+      if (!windowClosed(d)) return;
+      if (d.status === 'skipped') { s.skipped++; return; }
+      if (d.status === 'taken' || d.status === 'late' || d.status === 'missed') {
+        s[d.status]++; s.resolved++;
+      }
+    });
+    s.rate = s.resolved ? (s.taken + s.late) / s.resolved : 0;
+    return s;
+  }
+
+  function rangeFrom(days) { return startOfDay(now()) - (days - 1) * MS_DAY; }
+  function rangeStats(pid, days) { return adherenceStats(pid, rangeFrom(days), now()); }
+
+  function adherenceByDay(pid, days) {
+    var out = [], base = startOfDay(now());
+    for (var i = days - 1; i >= 0; i--) {
+      var from = base - i * MS_DAY, to = from + MS_DAY - 1;
+      var s = adherenceStats(pid, from, to);
+      out.push({ ts: from, rate: s.rate, resolved: s.resolved, taken: s.taken, late: s.late, missed: s.missed });
+    }
+    return out;
+  }
+
+  /* Doris's whole reason for existing in the dataset: this has to make the
+     evening problem impossible to miss. */
+  function adherenceByTimeOfDay(pid, days) {
+    var buckets = {};
+    DB.getDoseLogRange(pid, rangeFrom(days), now()).forEach(function (d) {
+      if (!windowClosed(d) || d.status === 'skipped') return;
+      var b = buckets[d.scheduled] || (buckets[d.scheduled] = { time:d.scheduled, ok:0, total:0 });
+      b.total++;
+      if (d.status === 'taken' || d.status === 'late') b.ok++;
+    });
+    return Object.keys(buckets).sort().map(function (k) {
+      var b = buckets[k];
+      b.rate = b.total ? b.ok / b.total : 0;
+      return b;
+    });
+  }
+
+  /* Days remaining is pills-on-hand divided by real daily consumption from the
+     schedule, not a flat guess — a twice-daily med drains twice as fast. */
+  function dailyUse(pid, pos) {
+    var c = DB.getCartridge(pid, pos);
+    if (!c || !c.medId) return 0;
+    var m = DB.getMedication(c.medId);
+    return m ? m.times.length * m.qty : 0;
+  }
+  function daysRemaining(pid, pos) {
+    var c = DB.getCartridge(pid, pos), use = dailyUse(pid, pos);
+    if (!c || !use) return null;
+    return Math.floor(c.count / use);
+  }
+  function isLow(pid, pos) {
+    var d = daysRemaining(pid, pos);
+    return d !== null && d < 7;
+  }
+
+  function unreadCount() {
+    return DB.getAlerts().filter(function (a) { return !a.read; }).length;
+  }
+
+  var alertSeq = 100;
+  function pushAlert(pid, severity, title, what, action) {
+    DB.alerts.unshift({
+      id: 'a' + (++alertSeq), patientId: pid, severity: severity,
+      atTs: now(), read: false, title: title, what: what, action: action
+    });
+  }
+  /* Seeded alerts carry an offset instead of a timestamp so the feed reads
+     correctly whatever day this is demoed, and so it follows the clock. */
+  function alertTs(a) { return a.atTs != null ? a.atTs : now() - a.offsetMin * MS_MIN; }
+
+  /* ==================================================================
+     SHELL: router, nav, announcements
+     ================================================================== */
+  var NAV_PRIMARY = [
+    { id:'home',       label:'Home',       short:'Home',    icon:'home' },
+    { id:'schedule',   label:'Schedule',   short:'Sched',   icon:'schedule' },
+    { id:'cartridges', label:'Cartridges', short:'Carts',   icon:'cartridges' },
+    { id:'history',    label:'History',    short:'History', icon:'history' },
+    { id:'alerts',     label:'Alerts',     short:'Alerts',  icon:'alerts' },
+    { id:'settings',   label:'Settings',   short:'Setup',   icon:'settings' }
+  ];
+  var NAV_SECONDARY = [
+    { id:'patient', label:'Patient view', short:'Patient', icon:'patient' }
+  ];
+  var ALL_VIEWS = NAV_PRIMARY.concat(NAV_SECONDARY).map(function (n) { return n.id; });
+
+  function announce(msg, assertive) {
+    var node = $(assertive ? '#live-assertive' : '#live-polite');
+    node.textContent = '';
+    // Re-setting on the next frame guarantees the announcement fires even when
+    // the same message repeats (e.g. two dispenses in a row).
+    requestAnimationFrame(function () { node.textContent = msg; });
+  }
+
+  var toastTimer = null;
+  function toast(msg) {
+    var box = $('#toasts');
+    box.innerHTML = '<p class="toast">' + esc(msg) + '</p>';
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { box.innerHTML = ''; }, 3600);
+  }
+
+  /* THE single state-update path. Every mutation goes through here so that a
+     change made on one screen is already true on all the others. */
+  function commit(mutate, opts) {
+    opts = opts || {};
+    if (typeof mutate === 'function') mutate();
+    resolveClock();
+    render();
+    if (opts.toast) toast(opts.toast);
+    if (opts.announce) announce(opts.announce, opts.assertive);
+  }
+
+  /* Hash routing gives deep links and a working back button on file:// and on a
+     static host. Some embedded contexts (data: URLs, sandboxed srcdoc frames)
+     refuse top-frame fragment writes and log an error for each attempt, so the
+     router falls back to pure in-memory navigation there rather than shouting
+     into the console. Every view still works either way. */
+  var HASH_ROUTING = location.protocol !== 'data:' && location.protocol !== 'about:';
+
+  function go(viewId, opts) {
+    if (ALL_VIEWS.indexOf(viewId) === -1) viewId = 'home';
+    state.view = viewId;
+    if (HASH_ROUTING && location.hash !== '#/' + viewId) location.hash = '#/' + viewId;
+    render();
+    if (!opts || !opts.silent) {
+      $('#main').focus();
+      window.scrollTo(0, 0);
+    }
+  }
+
+  function readHash() {
+    if (!HASH_ROUTING) return state.view || 'home';
+    var id = (location.hash || '').replace(/^#\/?/, '');
+    return ALL_VIEWS.indexOf(id) !== -1 ? id : 'home';
+  }
+
+  function renderNav() {
+    var unread = unreadCount();
+
+    function link(n, current) {
+      var badge = n.id === 'alerts' && unread
+        ? '<span class="navlink__count">' + unread + '<span class="sr-only"> unread alerts</span></span>' : '';
+      return '<li><button type="button" class="navlink' + (n.id === 'patient' ? ' navlink--alt' : '') +
+             '" data-go="' + n.id + '"' + (current ? ' aria-current="page"' : '') + '>' +
+             '<span class="navlink__icon">' + icon(n.icon, 20) + '</span>' +
+             '<span>' + esc(n.label) + '</span>' + badge + '</button></li>';
+    }
+
+    $('#nav-primary').innerHTML   = NAV_PRIMARY.map(function (n) { return link(n, n.id === state.view); }).join('');
+    $('#nav-secondary').innerHTML = NAV_SECONDARY.map(function (n) { return link(n, n.id === state.view); }).join('');
+
+    // Mobile: six tabs is the practical limit at 390px, so Settings moves to a
+    // gear in the top bar and Patient view keeps its slot in the bar.
+    var tabs = NAV_PRIMARY.filter(function (n) { return n.id !== 'settings'; }).concat(NAV_SECONDARY);
+    $('#nav-tabs').innerHTML = tabs.map(function (n) {
+      var dot = n.id === 'alerts' && unread ? '<span class="tablink__dot" aria-hidden="true"></span>' : '';
+      var badge = n.id === 'alerts' && unread ? '<span class="sr-only">, ' + unread + ' unread</span>' : '';
+      return '<li><button type="button" class="tablink" data-go="' + n.id + '"' +
+             (n.id === state.view ? ' aria-current="page"' : '') + '>' + dot +
+             '<span class="tablink__icon">' + icon(n.icon, 22) + '</span>' +
+             '<span>' + esc(n.short) + '</span>' + badge + '</button></li>';
+    }).join('');
+  }
+
+  function renderPatientSeg() {
+    var ps = DB.getPatients();
+    $('#patient-seg').innerHTML = ps.map(function (p) {
+      var on = p.id === state.patientId;
+      return '<button type="button" class="seg__btn" data-patient="' + p.id + '" aria-pressed="' + on + '">' +
+             esc(p.name.split(' ')[0]) + '</button>';
+    }).join('');
+  }
+
+  /* ==================================================================
+     VIEW 1 — HOME (caregiver dashboard)
+     ================================================================== */
+  function medLine(dose) {
+    var m = DB.getMedication(dose.medId);
+    if (!m) return 'Unknown medication';
+    return m.name + ' ' + m.strength;
+  }
+
+  function deviceLine(pid) {
+    var dev = DB.getDevice(pid);
+    if (!dev) return '';
+    var cup = dev.cupOccupied
+      ? '<b>Pill in the cup</b>'
+      : 'Cup empty';
+    return '<p class="devline">' +
+      '<span class="dot ' + (dev.online ? 'dot--on' : 'dot--off') + '" aria-hidden="true"></span>' +
+      '<b>' + (dev.online ? 'Online' : 'Offline') + '</b>' +
+      '<span class="devline__sep" aria-hidden="true">|</span>' +
+      '<span>Synced ' + esc(fmtAgo(now() - dev.lastSyncOffsetMin * MS_MIN)) + '</span>' +
+      '<span class="devline__sep" aria-hidden="true">|</span>' + cup +
+      '</p>';
+  }
+
+  function attentionStrip(pid) {
+    var att = attentionItems(pid);
+    var items = att.rows;
+    if (!items.length && !att.olderMissed) return '';
+
+    var rows = items.map(function (d) {
+      var m = DB.getMedication(d.medId);
+      var isCup = d.status === 'dispensed_not_taken';
+      var when = isCup
+        ? 'Dispensed at ' + fmtClock(d.dispensedTs) + ' — ' + fmtAgo(d.dispensedTs)
+        : 'Scheduled ' + fmtHHMM(d.scheduled) + ' on ' + fmtDate(d.scheduledTs);
+      var actions = isCup
+        ? '<button class="btn btn--primary" type="button" data-pickup="' + esc(d.id) + '">Mark picked up</button>' +
+          '<button class="btn btn--secondary" type="button" data-skip="' + esc(d.id) + '">Skip this dose</button>'
+        : '<button class="btn btn--secondary" type="button" data-dose="' + esc(d.id) + '">See details</button>';
+      return '<div class="attn__item">' +
+               chip(d.status) +
+               '<div class="attn__body"><strong>' + esc(m ? m.name + ' ' + m.strength : 'Dose') + '</strong>' +
+               '<span class="meta">' + esc(when) + '</span></div>' +
+               '<div class="row row--tight push">' + actions + '</div>' +
+             '</div>';
+    }).join('');
+
+    var tail = att.olderMissed
+      ? '<div class="attn__item">' +
+          '<div class="attn__body"><span class="meta">' + att.olderMissed +
+          ' other dose' + (att.olderMissed === 1 ? '' : 's') +
+          ' missed in the last week.</span></div>' +
+          '<div class="row row--tight push">' +
+            '<button class="btn btn--secondary btn--sm" type="button" data-go="history">See history</button>' +
+          '</div></div>'
+      : '';
+
+    return '<section class="attn" aria-labelledby="attn-h">' +
+             '<div class="attn__head">' + icon('warning', 18) +
+               '<p class="label" id="attn-h">Needs attention</p></div>' + rows + tail +
+           '</section>';
+  }
+
+  function heroSlab(pid) {
+    var slot = nextSlot(pid);
+    if (!slot) {
+      return '<div class="slab"><p class="label">Next dose</p>' +
+             '<p class="hero__time" style="font-size:var(--fs-xl)">Nothing left today</p>' +
+             '<p class="hero__count">Every scheduled dose has been dispensed. The next one is tomorrow morning.</p></div>';
+    }
+    var delta = slot.ts - now();
+    var isDue = slot.doses.some(function (d) { return d.status === 'due'; });
+    var meds = slot.doses.map(function (d) {
+      var m = DB.getMedication(d.medId);
+      return '<li class="hero__med"><b>' + esc(m ? m.name : 'Dose') + '</b>' +
+             '<span>' + esc((m ? m.strength : '') + ' · ' + d.qty + (d.qty === 1 ? ' pill' : ' pills') +
+             ' · cartridge ' + d.cartridge) + '</span></li>';
+    }).join('');
+
+    return '<div class="slab">' +
+             '<p class="label">Next dose</p>' +
+             '<p class="hero__time">' + esc(fmtClock(slot.ts)) + '</p>' +
+             '<p class="hero__count">' + (isDue ? 'Due now' : 'in ' + esc(fmtDuration(delta))) + '</p>' +
+             '<ul class="hero__meds">' + meds + '</ul>' +
+           '</div>';
+  }
+
+  function todayTimeline(pid) {
+    var doses = todayDoses(pid);
+    if (!doses.length) {
+      return '<div class="empty"><h3>No doses scheduled today</h3>' +
+             '<p>Add a medication to build a schedule for this patient.</p>' +
+             '<button class="btn btn--primary" type="button" data-go="schedule">Go to Schedule</button></div>';
+    }
+
+    // Group by scheduled time so a 3-pill morning reads as one moment.
+    var slots = [], byTime = {};
+    doses.forEach(function (d) {
+      if (!byTime[d.scheduled]) { byTime[d.scheduled] = []; slots.push(d.scheduled); }
+      byTime[d.scheduled].push(d);
+    });
+
+    var t = now();
+    return '<ol class="tl">' + slots.map(function (time) {
+      var group = byTime[time], ts = group[0].scheduledTs;
+      var live = group.some(function (d) { return d.status === 'due' || d.status === 'dispensed_not_taken'; });
+      var cls = live ? 'tl__slot--now' : (ts < t ? 'tl__slot--past' : '');
+
+      var rows = group.map(function (d) {
+        var m = DB.getMedication(d.medId);
+        var stamp = d.pickupTs ? 'Picked up ' + fmtClock(d.pickupTs)
+                  : d.dispensedTs ? 'Dispensed ' + fmtClock(d.dispensedTs)
+                  : 'Scheduled ' + fmtHHMM(d.scheduled);
+        var flag = d.status === 'dispensed_not_taken' ? ' tl__dose--flag' : '';
+        return '<li><button type="button" class="tl__dose' + flag + '" data-dose="' + esc(d.id) + '">' +
+                 '<span class="tl__name">' + esc(m ? m.name : 'Dose') +
+                 '<small>' + esc((m ? m.strength : '') + ' · ' + d.qty + ' pill' + (d.qty === 1 ? '' : 's')) + '</small></span>' +
+                 chip(d.status) +
+                 '<span class="tl__stamp">' + esc(stamp) + '</span>' +
+               '</button></li>';
+      }).join('');
+
+      return '<li class="tl__slot ' + cls + '">' +
+               '<span class="tl__marker" aria-hidden="true"></span>' +
+               '<p class="tl__time">' + esc(fmtHHMM(time)) + '</p>' +
+               '<ul class="tl__doses">' + rows + '</ul>' +
+             '</li>';
+    }).join('') + '</ol>';
+  }
+
+  function renderHome() {
+    var pid = state.patientId, p = DB.getPatient(pid);
+    var s7 = rangeStats(pid, 7);
+    var days = adherenceByDay(pid, 7);
+    var dev = DB.getDevice(pid);
+
+    var html =
+      '<div class="view__head">' +
+        '<h1 id="h-home">' + esc(p.name) + '</h1>' +
+        '<p>' + esc(p.age + ' · ' + p.living + ' · ' + p.relationship) + '</p>' +
+      '</div>' +
+      '<div class="stack">' +
+        attentionStrip(pid) +
+        '<div class="grid grid--home">' +
+
+          '<div class="stack">' +
+            heroSlab(pid) +
+            '<section class="panel panel--flush" aria-labelledby="today-h">' +
+              '<div class="panel__head"><h2 id="today-h">Today</h2>' +
+                '<span class="meta">' + esc(fmtDate(now())) + ' · app clock ' + esc(fmtClock(now())) + '</span></div>' +
+              '<div class="panel__body">' + todayTimeline(pid) + '</div>' +
+            '</section>' +
+          '</div>' +
+
+          '<div class="stack">' +
+            '<section class="panel" aria-labelledby="adh-h">' +
+              '<p class="label" id="adh-h">Adherence, last 7 days</p>' +
+              '<p class="big-num" style="margin-top:var(--sp-3)">' + pct(s7.rate) + '%</p>' +
+              '<p class="meta" style="margin-top:var(--sp-2)">' +
+                s7.taken + ' on time · ' + s7.late + ' late · ' + s7.missed + ' missed' +
+                (s7.skipped ? ' · ' + s7.skipped + ' skipped' : '') + '</p>' +
+              '<div style="margin-top:var(--sp-4)">' + sparkline(days) + '</div>' +
+              '<button class="btn btn--secondary btn--sm btn--block" style="margin-top:var(--sp-4)" ' +
+                'type="button" data-go="history">See full history</button>' +
+            '</section>' +
+
+            '<section class="panel" aria-labelledby="dev-h">' +
+              '<p class="label" id="dev-h">Dispenser</p>' +
+              '<div style="margin-top:var(--sp-3)">' + deviceLine(pid) + '</div>' +
+              '<dl class="kv" style="margin-top:var(--sp-4)">' +
+                '<dt>Serial</dt><dd>' + esc(dev.serial) + '</dd>' +
+                '<dt>Firmware</dt><dd>' + esc(dev.firmware) + '</dd>' +
+                '<dt>Power</dt><dd>' + esc(dev.power + (dev.power === 'Battery' ? ' · ' + dev.battery + '%' : '')) + '</dd>' +
+                '<dt>Carousel</dt><dd>Position ' + dev.carouselIndex + '</dd>' +
+              '</dl>' +
+              '<button class="btn btn--secondary btn--sm btn--block" style="margin-top:var(--sp-4)" ' +
+                'type="button" data-go="cartridges">View cartridges</button>' +
+            '</section>' +
+          '</div>' +
+
+        '</div>' +
+      '</div>';
+
+    $('#view-home').innerHTML = html;
+  }
+
+  /* ==================================================================
+     MODAL
+     ================================================================== */
+  var lastFocus = null;
+
+  function openModal(title, body, foot) {
+    lastFocus = document.activeElement;
+    $('#modal-title').textContent = title;
+    $('#modal-body').innerHTML = body;
+    $('#modal-foot').innerHTML = foot || '';
+    $('#modal').hidden = false;
+    var first = $('#modal-body input, #modal-body select, #modal-body button') || $('#modal-close');
+    if (first) first.focus();
+  }
+  function closeModal() {
+    $('#modal').hidden = true;
+    $('#modal-body').innerHTML = '';
+    $('#modal-foot').innerHTML = '';
+    if (lastFocus && document.contains(lastFocus)) lastFocus.focus();
+  }
+  function modalIsOpen() { return !$('#modal').hidden; }
+
+  /* Focus is trapped rather than merely moved: a caregiver tabbing past the end
+     of a dialog on a tablet should not land in the page behind the scrim. */
+  function trapFocus(e) {
+    if (!modalIsOpen() || e.key !== 'Tab') return;
+    var box = $('#modal .modal__box');
+    var f = $$('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])', box)
+              .filter(function (n) { return !n.disabled && n.offsetParent !== null; });
+    if (!f.length) return;
+    var first = f[0], last = f[f.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  }
+
+  /* ==================================================================
+     VIEW 2 — SCHEDULE, plus the barcode scan flow
+     ================================================================== */
+  function renderSchedule() {
+    var pid = state.patientId, p = DB.getPatient(pid);
+    var meds = DB.getMedications(pid);
+    var carts = DB.getCartridges(pid);
+    var freeCarts = carts.filter(function (c) { return !c.medId; }).length;
+
+    var rows = meds.map(function (m) {
+      var c = DB.getCartridge(pid, m.cartridge);
+      return '<tr>' +
+        '<td>' + esc(m.name) + '<div class="meta">' + esc(m.strength + ' ' + m.form) + '</div></td>' +
+        '<td><span class="cart-row__pos" style="display:inline-grid">' + m.cartridge + '</span></td>' +
+        '<td>' + m.times.map(function (t) { return esc(fmtHHMM(t)); }).join('<br>') + '</td>' +
+        '<td class="num">' + m.qty + '</td>' +
+        '<td class="num">' + (c ? c.count : 0) + '</td>' +
+        '<td><div class="row row--tight">' +
+          '<button class="btn btn--secondary btn--sm" type="button" data-editmed="' + esc(m.id) + '">Edit</button>' +
+          '<button class="btn btn--ghost btn--sm" type="button" data-delmed="' + esc(m.id) + '">Remove</button>' +
+        '</div></td></tr>';
+    }).join('');
+
+    var table = meds.length
+      ? '<div class="tbl-wrap" tabindex="0" role="region" aria-label="Medications table, scrolls sideways">' +
+        '<table class="tbl"><caption class="sr-only">Medications for ' + esc(p.name) + '</caption><thead><tr>' +
+        '<th scope="col">Medication</th><th scope="col">Cartridge</th><th scope="col">Dose times</th>' +
+        '<th scope="col">Pills</th><th scope="col">In cartridge</th><th scope="col"><span class="sr-only">Actions</span></th>' +
+        '</tr></thead><tbody>' + rows + '</tbody></table></div>'
+      : '<div class="empty"><h3>No medications yet</h3>' +
+        '<p>Scan a prescription label to fill in the details automatically, or add one by hand.</p>' +
+        '<button class="btn btn--primary" type="button" data-scan="1">Scan prescription label</button></div>';
+
+    $('#view-schedule').innerHTML =
+      '<div class="view__head"><h1 id="h-schedule">Schedule</h1>' +
+      '<p>What ' + esc(firstName(pid)) + ' takes, when, and which cartridge it comes from. ' +
+      'Changes are pushed to the dispenser after you confirm them.</p></div>' +
+      '<div class="stack">' +
+        '<div class="row">' +
+          '<button class="btn btn--primary" type="button" data-scan="1">' + icon('scan', 18) + 'Scan prescription label</button>' +
+          '<button class="btn btn--secondary" type="button" data-addmed="1">' + icon('plus', 18) + 'Add manually</button>' +
+          '<span class="meta push">' + freeCarts + ' of 8 cartridges free</span>' +
+        '</div>' +
+        '<section class="panel panel--flush" aria-labelledby="meds-h">' +
+          '<div class="panel__head"><h2 id="meds-h">Medications</h2>' +
+            '<span class="meta">' + meds.length + ' active</span></div>' +
+          table +
+        '</section>' +
+      '</div>';
+  }
+
+  /* ---- Barcode scan ------------------------------------------------
+     Simulated end to end. The app never asks for camera access; on the real
+     unit this is the GM65 module, or a phone camera, reading the NDC off the
+     label and resolving it against the NLM RxNorm API. */
+  var scanTimer = null;
+
+  function startScan() {
+    state.prefill = null;   // a previous scan must never leak into this one
+    var code = DB.scanSequence[state.scanIndex % DB.scanSequence.length];
+    state.scanIndex++;
+
+    openModal('Scan prescription label',
+      '<div class="scan">' +
+        '<div class="scan__frame"><span></span><span></span><span></span><span></span></div>' +
+        '<div class="scan__beam" aria-hidden="true"></div>' +
+        '<p class="scan__hint">Hold the barcode inside the frame</p>' +
+      '</div>' +
+      '<p class="meta" style="margin-top:var(--sp-3)" role="status">Reading barcode…</p>' +
+      '<p class="meta">Simulated scan — no camera is used.</p>',
+      '<button class="btn btn--secondary" type="button" data-modal-close="1">Cancel</button>');
+
+    clearTimeout(scanTimer);
+    scanTimer = setTimeout(function () { showScanResult(code); }, 2000);
+  }
+
+  function showScanResult(code) {
+    var res = DB.lookupNDC(code);
+    var list = res.ndcPropertyList && res.ndcPropertyList.ndcProperty;
+
+    if (!list || !list.length) {
+      openModal('Barcode not recognised',
+        '<div class="notice notice--warn">' + icon('warning', 20) +
+          '<div><b>No match for NDC ' + esc(code) + '</b>' +
+          '<p class="meta" style="margin-top:4px">The code scanned cleanly but it is not in the drug directory. ' +
+          'This happens with repackaged or compounded prescriptions.</p></div></div>' +
+        '<p class="meta" style="margin-top:var(--sp-4)">Type the details from the label instead, or try the scan again ' +
+        'with the barcode flat and well lit.</p>',
+        '<button class="btn btn--primary" type="button" data-addmed="1">Enter manually</button>' +
+        '<button class="btn btn--secondary" type="button" data-scan="1">Scan again</button>' +
+        '<button class="btn btn--ghost" type="button" data-modal-close="1">Cancel</button>');
+      announce('Barcode not recognised. Enter the medication manually or scan again.', true);
+      return;
+    }
+
+    var n = list[0], d = n._display;
+    var props = {};
+    n.propertyConceptList.propertyConcept.forEach(function (pc) { props[pc.propName] = pc.propValue; });
+
+    state.prefill = {
+      name: d.name, strength: d.strength, form: d.form,
+      qty: 1, ndc: n.ndcItem, rxcui: n.rxcui, packQty: d.packQty
+    };
+
+    openModal('Found on the label',
+      '<div class="notice notice--good">' + icon('info', 20) +
+        '<div><b>' + esc(d.name + ' ' + d.strength) + '</b>' +
+        '<p class="meta" style="margin-top:4px">Matched from the NDC on the barcode.</p></div></div>' +
+      '<dl class="kv" style="margin-top:var(--sp-4)">' +
+        '<dt>NDC</dt><dd class="scan__code">' + esc(n.ndcItem) + '</dd>' +
+        '<dt>RxCUI</dt><dd class="scan__code">' + esc(n.rxcui) + '</dd>' +
+        '<dt>Dose form</dt><dd>' + esc(props.DOSAGE_FORM || d.form) + '</dd>' +
+        '<dt>Packaging</dt><dd>' + esc(n.packagingList.packaging[0]) + '</dd>' +
+        '<dt>Labeler</dt><dd>' + esc(props.LABELER || '—') + '</dd>' +
+        '<dt>Appearance</dt><dd>' + esc((props.COLORTEXT || '') + ' ' + (props.SHAPE || '').toLowerCase()) + '</dd>' +
+      '</dl>' +
+      '<p class="meta" style="margin-top:var(--sp-4)">Check this against the label before you continue. ' +
+      'You can change any of it on the next screen.</p>',
+      '<button class="btn btn--primary" type="button" data-usescan="1">Use these details</button>' +
+      '<button class="btn btn--secondary" type="button" data-addmed="1">Correct them</button>' +
+      '<button class="btn btn--ghost" type="button" data-scan="1">Scan again</button>');
+    announce('Found ' + d.name + ' ' + d.strength + ' on the label.');
+  }
+
+  /* ---- Add / edit medication form ---------------------------------- */
+  function cartridgeOptions(pid, selected, ignoreMedId) {
+    return DB.getCartridges(pid).map(function (c) {
+      var occupied = c.medId && c.medId !== ignoreMedId;
+      var m = occupied ? DB.getMedication(c.medId) : null;
+      var label = occupied
+        ? c.position + ' — holds ' + m.name + ' ' + m.strength
+        : c.position + ' — empty';
+      return '<option value="' + c.position + '"' + (String(selected) === String(c.position) ? ' selected' : '') +
+             '>' + esc(label) + '</option>';
+    }).join('');
+  }
+
+  function openMedForm(medId) {
+    var pid = state.patientId;
+    var m = medId ? DB.getMedication(medId) : null;
+    var pre = m ? null : state.prefill;
+    state.editingMedId = medId || null;
+
+    var name     = m ? m.name     : (pre ? pre.name : '');
+    var strength = m ? m.strength : (pre ? pre.strength : '');
+    var qty      = m ? m.qty      : (pre ? pre.qty : 1);
+    var times    = m ? m.times.slice() : [];
+    var start    = m ? m.startDate : ymd(now());
+    var end      = m && m.endDate ? m.endDate : '';
+    var cart     = m ? m.cartridge : '';
+
+    function timeField(i, label, req) {
+      return '<div class="field"><label for="f-time' + i + '">' + label + '</label>' +
+             '<input type="time" id="f-time' + i + '" value="' + esc(times[i] || '') + '"' +
+             (req ? ' required' : '') + '></div>';
+    }
+
+    var banner = pre
+      ? '<div class="notice notice--good" style="margin-bottom:var(--sp-4)">' + icon('scan', 20) +
+        '<div><b>Pre-filled from the scanned label</b><p class="meta" style="margin-top:4px">NDC ' +
+        esc(pre.ndc) + ' · RxCUI ' + esc(pre.rxcui) + '. Bottle of ' + pre.packQty + '.</p></div></div>'
+      : '';
+
+    openModal(m ? 'Edit medication' : 'Add medication',
+      banner +
+      '<form id="med-form" novalidate>' +
+        '<div id="form-error" aria-live="assertive"></div>' +
+        '<div class="field"><label for="f-name">Medication name</label>' +
+          '<input type="text" id="f-name" value="' + esc(name) + '" autocomplete="off" required></div>' +
+        '<div class="field"><label for="f-strength">Strength</label>' +
+          '<input type="text" id="f-strength" value="' + esc(strength) + '" placeholder="e.g. 10 mg" required>' +
+          '<span class="field__hint">Copy this exactly from the label.</span></div>' +
+        '<div class="field" id="cart-field"><label for="f-cart">Cartridge</label>' +
+          '<select id="f-cart" required><option value="">Choose a cartridge</option>' +
+          cartridgeOptions(pid, cart, medId) + '</select>' +
+          '<span class="field__hint">One medication per cartridge. Position 0 is the home position.</span></div>' +
+        '<div class="grid grid--2" style="gap:var(--sp-4)">' +
+          timeField(0, 'Dose time 1', true) + timeField(1, 'Dose time 2 (optional)') +
+        '</div>' +
+        '<div class="grid grid--2" style="gap:var(--sp-4)">' +
+          timeField(2, 'Dose time 3 (optional)') +
+          '<div class="field"><label for="f-qty">Pills per dose</label>' +
+            '<input type="number" id="f-qty" min="1" max="6" value="' + qty + '" required></div>' +
+        '</div>' +
+        '<div class="grid grid--2" style="gap:var(--sp-4)">' +
+          '<div class="field"><label for="f-start">Start date</label>' +
+            '<input type="date" id="f-start" value="' + esc(start) + '" required></div>' +
+          '<div class="field"><label for="f-end">End date (optional)</label>' +
+            '<input type="date" id="f-end" value="' + esc(end) + '"></div>' +
+        '</div>' +
+      '</form>',
+      '<button class="btn btn--primary" type="button" data-savemed="1">' +
+        (m ? 'Save changes' : 'Save medication') + '</button>' +
+      '<button class="btn btn--secondary" type="button" data-modal-close="1">Cancel</button>');
+
+    state.prefill = null;   // consumed
+  }
+
+  function formError(msg) {
+    $('#form-error').innerHTML = '<p class="field__error" style="margin-bottom:var(--sp-4)">' +
+      icon('warning', 18) + '<span>' + esc(msg) + '</span></p>';
+    $('#modal-body').scrollTop = 0;
+  }
+
+  function saveMedForm() {
+    var pid = state.patientId, medId = state.editingMedId;
+    var name = $('#f-name').value.trim();
+    var strength = $('#f-strength').value.trim();
+    var cartVal = $('#f-cart').value;
+    var qty = parseInt($('#f-qty').value, 10);
+    var start = $('#f-start').value;
+    var end = $('#f-end').value;
+    var times = [0,1,2].map(function (i) { return $('#f-time' + i).value; })
+                       .filter(Boolean).sort();
+
+    $('#cart-field').classList.remove('field--invalid');
+
+    if (!name)     return formError('Enter the medication name as it appears on the label.');
+    if (!strength) return formError('Enter the strength, for example "10 mg".');
+    if (cartVal === '') return formError('Choose which cartridge this medication goes in.');
+    if (!times.length)  return formError('Add at least one dose time.');
+    if (!(qty >= 1))    return formError('Pills per dose must be 1 or more.');
+    if (!start)         return formError('Enter the date this schedule starts.');
+    if (end && end < start) return formError('The end date is before the start date. Fix one of them.');
+
+    var pos = parseInt(cartVal, 10);
+    var cart = DB.getCartridge(pid, pos);
+
+    // The rejection the brief asks for: never silently reassign a cartridge
+    // that already holds something, and name what is in the way.
+    if (cart && cart.medId && cart.medId !== medId) {
+      var other = DB.getMedication(cart.medId);
+      $('#cart-field').classList.add('field--invalid');
+      return formError('Cartridge ' + pos + ' already holds ' + other.name + ' ' + other.strength +
+        '. Pick an empty cartridge, or remove that medication first.');
+    }
+
+    var isNew = !medId;
+    var summary = (isNew ? 'Load ' : 'Update ') + name + ' ' + strength + ' in cartridge ' + pos + '. ' +
+      'The dispenser will release ' + qty + (qty === 1 ? ' pill' : ' pills') + ' at ' +
+      times.map(fmtHHMM).join(' and ') + ', starting ' + fmtLongDate(new Date(start + 'T00:00:00').getTime()) + '.';
+
+    confirmAndSync('Confirm schedule change', summary, function () {
+      if (isNew) {
+        var newId = 'm' + (Date.now() % 100000);
+        DB.medications.push({ id:newId, patientId:pid, name:name, strength:strength,
+          form:'tablet', cartridge:pos, times:times, qty:qty, startDate:start, endDate:end || null });
+        if (cart) { cart.medId = newId; if (!cart.count) cart.count = 30; }
+      } else {
+        var m = DB.getMedication(medId);
+        var oldCart = DB.getCartridge(pid, m.cartridge);
+        if (oldCart && oldCart.position !== pos) { oldCart.medId = null; oldCart.count = 0; }
+        m.name = name; m.strength = strength; m.cartridge = pos;
+        m.times = times; m.qty = qty; m.startDate = start; m.endDate = end || null;
+        if (cart) { cart.medId = medId; if (!cart.count) cart.count = 30; }
+      }
+    }, (isNew ? 'Added ' : 'Updated ') + name + ' ' + strength + '.');
+  }
+
+  /* Every schedule edit shows what the device will do, then a real sync state.
+     Silent writes to a machine that dispenses pills are not acceptable. */
+  function confirmAndSync(title, summary, apply, doneMsg) {
+    openModal(title,
+      '<p style="margin-bottom:var(--sp-4)">' + esc(summary) + '</p>' +
+      '<div class="notice">' + icon('device', 20) +
+        '<div><b>This changes what the dispenser does</b>' +
+        '<p class="meta" style="margin-top:4px">The new schedule is written to the unit and takes effect ' +
+        'from the next dose window.</p></div></div>' +
+      '<div id="sync-state"></div>',
+      '<button class="btn btn--primary" type="button" data-confirmsync="1">Confirm and sync</button>' +
+      '<button class="btn btn--secondary" type="button" data-modal-close="1">Cancel</button>');
+
+    pendingSync = { apply: apply, doneMsg: doneMsg };
+  }
+
+  var pendingSync = null;
+
+  function runSync() {
+    if (!pendingSync) return;
+    var job = pendingSync; pendingSync = null;
+
+    $('#modal-foot').innerHTML = '';
+    $('#sync-state').innerHTML =
+      '<p class="sync" style="margin-top:var(--sp-4)" role="status">' +
+      logoMark(28, { stepping: true }) + '<span>Syncing to the dispenser…</span></p>';
+
+    setTimeout(function () {
+      commit(job.apply, { toast: job.doneMsg, announce: job.doneMsg + ' Synced to the dispenser.' });
+      $('#sync-state').innerHTML =
+        '<div class="notice notice--good" style="margin-top:var(--sp-4)">' + icon('info', 20) +
+        '<div><b>Synced</b><p class="meta" style="margin-top:4px">' + esc(job.doneMsg) + '</p></div></div>';
+      $('#modal-foot').innerHTML = '<button class="btn btn--primary" type="button" data-modal-close="1">Done</button>';
+      var b = $('#modal-foot button'); if (b) b.focus();
+    }, 1500);
+  }
+
+  function confirmRemoveMed(medId) {
+    var m = DB.getMedication(medId);
+    if (!m) return;
+    confirmAndSync('Remove medication',
+      'Remove ' + m.name + ' ' + m.strength + ' from the schedule and free cartridge ' + m.cartridge +
+      '. Doses already recorded stay in the history.',
+      function () {
+        var c = DB.getCartridge(m.patientId, m.cartridge);
+        if (c) { c.medId = null; c.count = 0; }
+        DB.medications = DB.medications.filter(function (x) { return x.id !== medId; });
+        DB.doseLog = DB.doseLog.filter(function (d) {
+          return d.medId !== medId || d.scheduledTs < now();   // keep the record, drop the future
+        });
+      },
+      'Removed ' + m.name + ' ' + m.strength + '.');
+  }
+
+  /* ==================================================================
+     VIEW 3 — CARTRIDGES
+     Drawn as the carousel it physically is, not as a list. The ring rotates
+     in 45-degree steps and the chute marker stays fixed at 12 o'clock,
+     because that is how the mechanism actually indexes.
+     ================================================================== */
+  function polar(cx, cy, r, deg) {
+    var a = deg * Math.PI / 180;
+    return [+(cx + r * Math.cos(a)).toFixed(2), +(cy + r * Math.sin(a)).toFixed(2)];
+  }
+  function annulus(cx, cy, rIn, rOut, a0, a1) {
+    var p1 = polar(cx, cy, rOut, a0), p2 = polar(cx, cy, rOut, a1);
+    var p3 = polar(cx, cy, rIn, a1),  p4 = polar(cx, cy, rIn, a0);
+    var large = (a1 - a0) > 180 ? 1 : 0;
+    return 'M' + p1[0] + ' ' + p1[1] + 'A' + rOut + ' ' + rOut + ' 0 ' + large + ' 1 ' + p2[0] + ' ' + p2[1] +
+           'L' + p3[0] + ' ' + p3[1] + 'A' + rIn + ' ' + rIn + ' 0 ' + large + ' 0 ' + p4[0] + ' ' + p4[1] + 'Z';
+  }
+
+  function carouselSvg(pid) {
+    var CX = 200, CY = 200, R_IN = 56, R_OUT = 168;
+    var carts = DB.getCartridges(pid);
+    var spin = state.carouselSpin;
+
+    var wedges = carts.map(function (c) {
+      var mid = -90 + c.position * 45;
+      var path = annulus(CX, CY, R_IN, R_OUT, mid - 21.3, mid + 21.3);
+      var med = c.medId ? DB.getMedication(c.medId) : null;
+      var low = med && isLow(pid, c.position);
+      var sel = state.selectedCartridge === c.position;
+
+      var fill = !med ? 'var(--dl-card)' : (low ? 'var(--dl-amber-tint)' : 'var(--dl-ink-tint)');
+      var stroke = sel ? 'var(--dl-ink)' : (!med ? 'var(--dl-mute)' : (low ? 'var(--dl-amber)' : 'var(--dl-line)'));
+      var dash = med ? '' : ' stroke-dasharray="5 4"';
+
+      // A 45-degree wedge is only ~85 user units wide at the label radius, so
+      // names are clipped to what actually fits rather than allowed to run
+      // across the neighbouring cartridge.
+      var lp = polar(CX, CY, 120, mid);
+      var short = med && med.name.length > 10 ? med.name.slice(0, 9) + '…' : (med ? med.name : '');
+      var label = med
+        ? '<text x="' + lp[0] + '" y="' + (lp[1] - 5) + '" text-anchor="middle" font-size="13" font-weight="700" fill="var(--dl-ink)">' +
+            esc(short) + '<title>' + esc(med.name + ' ' + med.strength) + '</title></text>' +
+          '<text x="' + lp[0] + '" y="' + (lp[1] + 12) + '" text-anchor="middle" font-size="12" fill="var(--dl-slate)">' +
+            c.count + ' left</text>'
+        : '<text x="' + lp[0] + '" y="' + (lp[1] + 4) + '" text-anchor="middle" font-size="12" fill="var(--dl-slate)">empty</text>';
+
+      // At 3 and 9 o'clock the label and the position badge sit on the same
+      // horizontal radius, so they need ~45 units of separation or they collide.
+      var num = polar(CX, CY, 68, mid);
+
+      return '<g class="cart-hit" role="button" tabindex="0" data-cart="' + c.position + '" ' +
+               'aria-label="Cartridge ' + c.position + ', ' +
+               esc(med ? med.name + ' ' + med.strength + ', ' + c.count + ' pills left' : 'empty') +
+               (low ? ', refill soon' : '') + '"' + (sel ? ' aria-pressed="true"' : '') + '>' +
+               '<path class="cart-wedge" d="' + path + '" fill="' + fill + '" stroke="' + stroke +
+                 '" stroke-width="' + (sel ? 3 : 1.5) + '"' + dash + '/>' +
+               '<g class="cart-label" style="transform-origin:' + lp[0] + 'px ' + lp[1] + 'px">' + label + '</g>' +
+               '<g class="cart-label" style="transform-origin:' + num[0] + 'px ' + num[1] + 'px">' +
+                 '<circle cx="' + num[0] + '" cy="' + num[1] + '" r="12" fill="var(--dl-card)" stroke="var(--dl-line)"/>' +
+                 '<text x="' + num[0] + '" y="' + (num[1] + 4.5) + '" text-anchor="middle" font-size="13" ' +
+                 'font-weight="700" fill="var(--dl-slate)">' + c.position + '</text></g>' +
+             '</g>';
+    }).join('');
+
+    return '<svg class="carousel__svg" viewBox="0 0 400 400" style="--spin:' + spin + 'deg" ' +
+             'role="img" aria-label="Eight-position carousel. Cartridge ' +
+             DB.getDevice(pid).carouselIndex + ' is at the dispense position.">' +
+             // Fixed chute marker — it does not rotate, the carousel does.
+             '<g>' +
+               '<path d="M186 6h28l-6 20h-16Z" fill="var(--dl-ink)"/>' +
+               '<text x="200" y="42" text-anchor="middle" font-size="12" font-weight="700" ' +
+                 'letter-spacing="1.2" fill="var(--dl-slate)">CHUTE</text>' +
+             '</g>' +
+             '<g class="carousel__ring">' + wedges + '</g>' +
+             '<circle cx="200" cy="200" r="' + 40 + '" fill="var(--dl-card)" stroke="var(--dl-line)" stroke-width="1.5"/>' +
+             '<text x="200" y="196" text-anchor="middle" font-size="12" font-weight="700" ' +
+               'letter-spacing="1" fill="var(--dl-slate)">POS</text>' +
+             '<text x="200" y="218" text-anchor="middle" font-size="20" font-weight="700" ' +
+               'fill="var(--dl-ink)">' + DB.getDevice(pid).carouselIndex + '</text>' +
+           '</svg>';
+  }
+
+  function cartridgeDetail(pid, pos) {
+    var c = DB.getCartridge(pid, pos);
+    if (!c) return '';
+    var med = c.medId ? DB.getMedication(c.medId) : null;
+
+    if (!med) {
+      return '<div class="empty" style="padding:var(--sp-6) var(--sp-4)">' +
+               '<h3>Cartridge ' + pos + ' is empty</h3>' +
+               '<p>Nothing is loaded in this position. Assign a medication to start dispensing from it.</p>' +
+               '<button class="btn btn--primary" type="button" data-assign="' + pos + '">Assign medication</button>' +
+             '</div>';
+    }
+
+    var days = daysRemaining(pid, pos), low = isLow(pid, pos);
+    var use = dailyUse(pid, pos);
+    var fillPct = Math.round(c.count / c.capacity * 100);
+
+    return '<div class="stack" style="gap:var(--sp-4)">' +
+      '<div class="row"><h3 style="margin-right:auto">' + esc(med.name + ' ' + med.strength) + '</h3>' +
+        (low ? '<span class="flag-low">' + icon('warning', 14) + 'Refill soon</span>' : '') + '</div>' +
+      '<div class="grid grid--2" style="gap:var(--sp-4)">' +
+        '<div><p class="label">Pills left</p><p class="big-num">' + c.count + '</p>' +
+          '<div class="meter"><div class="meter__fill' + (low ? ' meter__fill--low' : '') +
+            '" style="width:' + fillPct + '%"></div></div>' +
+          '<p class="meta" style="margin-top:6px">of ' + c.capacity + ' capacity</p></div>' +
+        '<div><p class="label">Days remaining</p><p class="big-num">' + (days === null ? '—' : days) + '</p>' +
+          '<p class="meta" style="margin-top:6px">at ' + use + ' pill' + (use === 1 ? '' : 's') + ' a day</p></div>' +
+      '</div>' +
+      '<dl class="kv">' +
+        '<dt>Dose times</dt><dd>' + med.times.map(fmtHHMM).map(esc).join(', ') + '</dd>' +
+        '<dt>Per dose</dt><dd>' + med.qty + ' pill' + (med.qty === 1 ? '' : 's') + '</dd>' +
+        '<dt>Position</dt><dd>' + pos + ' of 0–7</dd>' +
+      '</dl>' +
+      '<div class="row">' +
+        '<button class="btn btn--primary" type="button" data-refill="' + pos + '">' + icon('refill', 18) + 'Refill cartridge</button>' +
+        '<button class="btn btn--secondary" type="button" data-editmed="' + esc(med.id) + '">Edit schedule</button>' +
+      '</div>' +
+    '</div>';
+  }
+
+  function renderCartridges() {
+    var pid = state.patientId;
+    var carts = DB.getCartridges(pid);
+    var lows = carts.filter(function (c) { return c.medId && isLow(pid, c.position); });
+
+    var list = carts.map(function (c) {
+      var med = c.medId ? DB.getMedication(c.medId) : null;
+      var days = daysRemaining(pid, c.position);
+      var low = med && isLow(pid, c.position);
+      var sel = state.selectedCartridge === c.position;
+      return '<button type="button" class="cart-row" data-cart="' + c.position + '" aria-pressed="' + sel + '">' +
+        '<span class="cart-row__pos' + (med ? '' : ' cart-row__pos--empty') + '">' + c.position + '</span>' +
+        '<span class="cart-row__name">' + (med ? esc(med.name) : '<em>Empty</em>') +
+          '<small>' + (med ? esc(med.strength + ' · ' + med.times.map(fmtHHMM).join(', ')) : 'Available') + '</small></span>' +
+        (med ? '<span class="cart-row__count">' + c.count + '<small>' +
+                 (days === null ? '' : days + ' day' + (days === 1 ? '' : 's')) + '</small></span>' : '') +
+        (low ? '<span class="flag-low">' + icon('warning', 14) + 'Low</span>' : '') +
+      '</button>';
+    }).join('');
+
+    var banner = lows.length
+      ? '<div class="notice notice--warn">' + icon('warning', 20) +
+        '<div><b>' + lows.length + ' cartridge' + (lows.length === 1 ? '' : 's') + ' below a week of supply</b>' +
+        '<p class="meta" style="margin-top:4px">' +
+        esc(lows.map(function (c) { return DB.getMedication(c.medId).name + ' (position ' + c.position + ')'; }).join(', ')) +
+        '. Refill and log it so the estimate resets.</p></div></div>'
+      : '';
+
+    $('#view-cartridges').innerHTML =
+      '<div class="view__head"><h1 id="h-cartridges">Cartridges</h1>' +
+      '<p>Eight positions on the carousel. Counts come from the load cell under the collection cup, ' +
+      'so they reflect what is physically in the unit.</p></div>' +
+      '<div class="stack">' + banner +
+        '<div class="carousel">' +
+          '<div class="carousel__stage">' + carouselSvg(pid) +
+            '<p class="meta" style="text-align:center;margin-top:var(--sp-3)">' +
+            'Select a wedge or a row to see that cartridge.</p></div>' +
+          '<div class="stack">' +
+            '<div class="cart-list">' + list + '</div>' +
+            '<section class="panel" aria-labelledby="cart-detail-h">' +
+              '<p class="label" id="cart-detail-h">Cartridge ' + state.selectedCartridge + '</p>' +
+              '<div style="margin-top:var(--sp-3)">' + cartridgeDetail(pid, state.selectedCartridge) + '</div>' +
+            '</section>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+  }
+
+  function refillCartridge(pos) {
+    var pid = state.patientId;
+    var c = DB.getCartridge(pid, pos);
+    if (!c || !c.medId) return;
+    var med = DB.getMedication(c.medId);
+    commit(function () {
+      c.count = c.capacity;
+      pushAlert(pid, 'informational', med.name + ' cartridge refilled',
+        'Cartridge ' + pos + ' was refilled to ' + c.capacity + ' pills.',
+        'No action needed. The days-remaining estimate has reset.');
+    }, {
+      toast: 'Cartridge ' + pos + ' refilled to ' + c.capacity + ' pills.',
+      announce: med.name + ' cartridge refilled to ' + c.capacity + ' pills.'
+    });
+  }
+
+  /* ---- Dose detail -------------------------------------------------- */
+  function openDoseDetail(doseId) {
+    var d = DB.getDose(doseId);
+    if (!d) return;
+    var med = DB.getMedication(d.medId);
+    var canAct = d.status === 'dispensed_not_taken' || d.status === 'due' || d.status === 'upcoming';
+
+    openModal((med ? med.name + ' ' + med.strength : 'Dose'),
+      '<div style="margin-bottom:var(--sp-4)">' + chip(d.status, { noPulse: true }) + '</div>' +
+      '<dl class="kv">' +
+        '<dt>Date</dt><dd>' + esc(fmtLongDate(d.scheduledTs)) + '</dd>' +
+        '<dt>Scheduled</dt><dd>' + esc(fmtHHMM(d.scheduled)) + '</dd>' +
+        '<dt>Dispensed</dt><dd>' + esc(d.dispensedTs ? fmtClock(d.dispensedTs) : 'Not dispensed') + '</dd>' +
+        '<dt>Picked up</dt><dd>' + esc(d.pickupTs ? fmtClock(d.pickupTs) : 'Not picked up') + '</dd>' +
+        '<dt>Quantity</dt><dd>' + d.qty + ' pill' + (d.qty === 1 ? '' : 's') + '</dd>' +
+        '<dt>Cartridge</dt><dd>Position ' + d.cartridge + '</dd>' +
+      '</dl>' +
+      '<p class="meta" style="margin-top:var(--sp-4)">' + esc(STATUS_SR[d.status]) + '.</p>',
+      (canAct
+        ? '<button class="btn btn--primary" type="button" data-pickup="' + esc(d.id) + '">Mark picked up</button>' +
+          '<button class="btn btn--secondary" type="button" data-skip="' + esc(d.id) + '">Skip this dose</button>'
+        : '') +
+      '<button class="btn btn--ghost" type="button" data-modal-close="1">Close</button>');
+  }
+
+  /* ==================================================================
+     CHARTS
+     Hand-generated inline SVG. No chart library and no canvas: the panel
+     will see this projected, and text in real SVG stays crisp at any size.
+     Every bar is a two-part column — dark = doses taken, light = the rest —
+     so the reader never has to guess what the missing height means.
+     ================================================================== */
+  function sparkline(days) {
+    var W = 220, H = 48, gap = 3;
+    var bw = (W - gap * (days.length - 1)) / days.length;
+    var bars = days.map(function (d, i) {
+      var x = +(i * (bw + gap)).toFixed(2);
+      var h = Math.max(2, d.resolved ? d.rate * H : 0);
+      var base = '<rect x="' + x + '" y="0" width="' + bw.toFixed(2) + '" height="' + H +
+                 '" fill="var(--dl-line)" rx="2"/>';
+      var fill = d.resolved
+        ? '<rect x="' + x + '" y="' + (H - h).toFixed(2) + '" width="' + bw.toFixed(2) +
+          '" height="' + h.toFixed(2) + '" fill="var(--dl-ink)" rx="2"/>' : '';
+      return base + fill;
+    }).join('');
+
+    var summary = days.map(function (d) {
+      return fmtDate(d.ts) + ': ' + (d.resolved ? pct(d.rate) + '%' : 'no doses');
+    }).join(', ');
+
+    return '<svg class="spark" viewBox="0 0 ' + W + ' ' + H + '" role="img" ' +
+           'aria-label="Daily adherence for the last 7 days. ' + esc(summary) + '">' + bars + '</svg>';
+  }
+
+  function adherenceChart(days) {
+    var W = 760, H = 250, L = 44, R = 10, T = 14, B = 32;
+    var pw = W - L - R, ph = H - T - B;
+    var n = days.length;
+    var gap = n > 45 ? 1 : (n > 14 ? 2 : 6);
+    var bw = Math.max(2, (pw - gap * (n - 1)) / n);
+
+    var grid = '', ticks = [0, 25, 50, 75, 100];
+    ticks.forEach(function (v) {
+      var y = +(T + ph - (v / 100) * ph).toFixed(2);
+      grid += '<line class="grid-line" x1="' + L + '" y1="' + y + '" x2="' + (W - R) + '" y2="' + y + '"/>' +
+              '<text class="axis-label" x="' + (L - 8) + '" y="' + (y + 4) + '" text-anchor="end">' + v + '%</text>';
+    });
+
+    var bars = days.map(function (d, i) {
+      var x = +(L + i * (bw + gap)).toFixed(2);
+      var h = d.resolved ? +(d.rate * ph).toFixed(2) : 0;
+      var out = '<rect x="' + x + '" y="' + T + '" width="' + bw.toFixed(2) + '" height="' + ph +
+                '" fill="var(--dl-line)"/>';
+      if (d.resolved) {
+        out += '<rect x="' + x + '" y="' + (T + ph - h).toFixed(2) + '" width="' + bw.toFixed(2) +
+               '" height="' + h + '" fill="var(--dl-ink)"><title>' +
+               esc(fmtDate(d.ts) + ' — ' + pct(d.rate) + '% (' + (d.taken + d.late) + ' of ' + d.resolved + ')') +
+               '</title></rect>';
+      }
+      return out;
+    }).join('');
+
+    // Roughly six x labels whatever the range, so 7/30/90 all stay readable.
+    var step = Math.max(1, Math.round(n / 6)), xlabels = '';
+    for (var i = 0; i < n; i += step) {
+      var x = +(L + i * (bw + gap) + bw / 2).toFixed(2);
+      xlabels += '<text class="axis-label" x="' + x + '" y="' + (H - 10) + '" text-anchor="middle">' +
+                 esc(fmtDate(days[i].ts).replace(/^\w+, /, '')) + '</text>';
+    }
+
+    var overall = days.reduce(function (a, d) { return a + (d.resolved ? d.rate : 0); }, 0) /
+                  (days.filter(function (d) { return d.resolved; }).length || 1);
+
+    return '<svg class="chart" viewBox="0 0 ' + W + ' ' + H + '" role="img" ' +
+           'aria-label="Daily adherence over ' + n + ' days, averaging ' + pct(overall) + ' percent.">' +
+           grid + bars + xlabels +
+           '<line class="grid-line" x1="' + L + '" y1="' + (T + ph) + '" x2="' + (W - R) + '" y2="' + (T + ph) +
+           '" stroke="var(--dl-slate)"/></svg>';
+  }
+
+  function timeOfDayChart(buckets) {
+    if (!buckets.length) return '<p class="meta">No resolved doses in this range.</p>';
+    var W = 760, rowH = 46, T = 8, L = 92, R = 74;
+    var H = T * 2 + buckets.length * rowH;
+    var pw = W - L - R;
+
+    var rows = buckets.map(function (b, i) {
+      var y = T + i * rowH;
+      var w = +(b.rate * pw).toFixed(2);
+      return '<text class="axis-label" x="' + (L - 12) + '" y="' + (y + 26) + '" text-anchor="end" ' +
+               'font-size="14" font-weight="700" fill="var(--dl-ink)">' + esc(fmtHHMM(b.time)) + '</text>' +
+             '<rect x="' + L + '" y="' + (y + 10) + '" width="' + pw + '" height="22" fill="var(--dl-line)" rx="3"/>' +
+             '<rect x="' + L + '" y="' + (y + 10) + '" width="' + w + '" height="22" fill="var(--dl-ink)" rx="3">' +
+               '<title>' + esc(fmtHHMM(b.time) + ' — ' + pct(b.rate) + '% of ' + b.total + ' doses') + '</title></rect>' +
+             '<text class="axis-label" x="' + (W - R + 10) + '" y="' + (y + 26) + '" font-size="14" ' +
+               'font-weight="700" fill="var(--dl-ink)">' + pct(b.rate) + '%</text>';
+    }).join('');
+
+    var summary = buckets.map(function (b) { return fmtHHMM(b.time) + ' ' + pct(b.rate) + '%'; }).join(', ');
+    return '<svg class="chart" viewBox="0 0 ' + W + ' ' + H + '" role="img" ' +
+           'aria-label="Adherence by dose time. ' + esc(summary) + '">' + rows + '</svg>';
+  }
+
+  /* States a pattern only when the data actually shows one. Nothing here is a
+     clinical claim — it is arithmetic on the dose log, phrased as such. */
+  function timeOfDayInsight(buckets) {
+    var am = buckets.filter(function (b) { return parseInt(b.time, 10) < 15; });
+    var pm = buckets.filter(function (b) { return parseInt(b.time, 10) >= 15; });
+    if (!am.length || !pm.length) return '';
+    function avg(a) { return a.reduce(function (s, b) { return s + b.rate; }, 0) / a.length; }
+    var d = avg(am) - avg(pm);
+    if (Math.abs(d) < 0.12) return '';
+    var worse = d > 0 ? 'Evening' : 'Morning';
+    var wl = d > 0 ? pm : am, bl = d > 0 ? am : pm;
+    return '<p class="insight"><b>' + worse + ' doses are the weak point.</b> ' +
+      esc(wl.map(function (b) { return fmtHHMM(b.time); }).join(' and ')) + ' come in at ' +
+      pct(avg(wl)) + '%, against ' + pct(avg(bl)) + '% for ' +
+      esc(bl.map(function (b) { return fmtHHMM(b.time); }).join(' and ')) +
+      '. Worth raising at the next appointment.</p>';
+  }
+
+  /* ==================================================================
+     VIEW 4 — HISTORY
+     ================================================================== */
+  var LOG_LIMIT = 40;
+
+  function renderHistory() {
+    var pid = state.patientId, p = DB.getPatient(pid), days = state.historyRange;
+    var s = rangeStats(pid, days);
+    var byDay = adherenceByDay(pid, days);
+    var byTime = adherenceByTimeOfDay(pid, days);
+
+    var log = DB.getDoseLogRange(pid, rangeFrom(days), now())
+                .filter(function (d) { return windowClosed(d) || d.status === 'dispensed_not_taken'; })
+                .sort(function (a, b) { return b.scheduledTs - a.scheduledTs; });
+    var shown = log.slice(0, LOG_LIMIT);
+
+    var rows = shown.map(function (d) {
+      var m = DB.getMedication(d.medId);
+      return '<tr class="tbl__row" tabindex="0" data-dose="' + esc(d.id) + '">' +
+        '<td>' + esc(m ? m.name : 'Dose') + '<div class="meta">' + esc(m ? m.strength : '') + '</div></td>' +
+        '<td class="num">' + esc(fmtDate(d.scheduledTs)) + '</td>' +
+        '<td class="num">' + esc(fmtHHMM(d.scheduled)) + '</td>' +
+        '<td class="num">' + esc(d.dispensedTs ? fmtClock(d.dispensedTs) : '—') + '</td>' +
+        '<td class="num">' + esc(d.pickupTs ? fmtClock(d.pickupTs) : '—') + '</td>' +
+        '<td>' + chip(d.status, { noPulse: true }) + '</td>' +
+        '<td class="num">' + d.cartridge + '</td></tr>';
+    }).join('');
+
+    var seg = [7, 30, 90].map(function (n) {
+      return '<button type="button" class="seg__btn" data-range="' + n + '" aria-pressed="' +
+             (n === days) + '">' + n + ' days</button>';
+    }).join('');
+
+    $('#view-history').innerHTML =
+      '<div class="view__head"><h1 id="h-history">History</h1>' +
+      '<p>Every dose ' + esc(firstName(pid)) + ' was scheduled to take, and what actually happened to it.</p></div>' +
+      '<div class="stack">' +
+
+        '<div class="row">' +
+          '<div class="seg" role="group" aria-label="Time range">' + seg + '</div>' +
+          '<button class="btn btn--secondary push" type="button" data-print="1">' +
+            icon('print', 18) + 'Export summary</button>' +
+        '</div>' +
+
+        '<section class="panel" aria-labelledby="sum-h">' +
+          '<p class="label" id="sum-h">Last ' + days + ' days</p>' +
+          '<div class="grid grid--3" style="margin-top:var(--sp-4);gap:var(--sp-5)">' +
+            '<div><p class="big-num">' + pct(s.rate) + '%</p><p class="meta">taken, on time or late</p></div>' +
+            '<div><p class="big-num">' + s.missed + '</p><p class="meta">missed</p></div>' +
+            '<div><p class="big-num">' + s.late + '</p><p class="meta">late</p></div>' +
+          '</div>' +
+          '<p class="meta" style="margin-top:var(--sp-4)">Based on ' + s.resolved +
+            ' doses whose window has closed' + (s.skipped ? ', excluding ' + s.skipped + ' skipped' : '') + '.</p>' +
+        '</section>' +
+
+        '<section class="panel" aria-labelledby="chart-h">' +
+          '<h2 id="chart-h">Adherence over time</h2>' +
+          '<div style="margin-top:var(--sp-4)">' + adherenceChart(byDay) + '</div>' +
+          '<div class="chart__legend">' +
+            '<span class="chart__key"><span class="chart__swatch" style="background:var(--dl-ink)"></span>Taken</span>' +
+            '<span class="chart__key"><span class="chart__swatch" style="background:var(--dl-line)"></span>Missed or not yet resolved</span>' +
+          '</div>' +
+        '</section>' +
+
+        '<section class="panel" aria-labelledby="tod-h">' +
+          '<h2 id="tod-h">By time of day</h2>' +
+          '<div style="margin-top:var(--sp-4)">' + timeOfDayChart(byTime) + '</div>' +
+          timeOfDayInsight(byTime) +
+        '</section>' +
+
+        '<section class="panel panel--flush" aria-labelledby="log-h">' +
+          '<div class="panel__head"><h2 id="log-h">Dose log</h2>' +
+            '<span class="meta">' + (log.length > LOG_LIMIT
+              ? 'Showing the ' + LOG_LIMIT + ' most recent of ' + log.length
+              : log.length + ' dose' + (log.length === 1 ? '' : 's')) + '</span></div>' +
+          (shown.length
+            ? '<div class="tbl-wrap" tabindex="0" role="region" aria-label="Dose log table, scrolls sideways">' +
+              '<table class="tbl"><caption class="sr-only">Dose log for ' + esc(p.name) + '</caption><thead><tr>' +
+              '<th scope="col">Medication</th><th scope="col">Date</th><th scope="col">Scheduled</th>' +
+              '<th scope="col">Dispensed</th><th scope="col">Picked up</th><th scope="col">Status</th>' +
+              '<th scope="col">Cart</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
+            : '<div class="empty"><h3>Nothing in this range</h3><p>Try a longer range.</p></div>') +
+        '</section>' +
+
+      '</div>';
+  }
+
+  /* ---- Printable summary -------------------------------------------
+     A caregiver taking this to an appointment is a real workflow, so the
+     print output is built as its own document rather than a screenshot of
+     the app with the chrome hidden. */
+  function buildPrintSummary() {
+    var pid = state.patientId, p = DB.getPatient(pid), days = state.historyRange;
+    var s = rangeStats(pid, days);
+    var byTime = adherenceByTimeOfDay(pid, days);
+    var meds = DB.getMedications(pid);
+    var log = DB.getDoseLogRange(pid, rangeFrom(days), now())
+                .filter(function (d) { return windowClosed(d); })
+                .sort(function (a, b) { return b.scheduledTs - a.scheduledTs; })
+                .slice(0, 60);
+
+    var medRows = meds.map(function (m) {
+      return '<tr><td>' + esc(m.name) + '</td><td>' + esc(m.strength) + '</td><td>' +
+             esc(m.times.map(fmtHHMM).join(', ')) + '</td><td>' + m.qty + '</td></tr>';
+    }).join('');
+
+    var todRows = byTime.map(function (b) {
+      return '<tr><td>' + esc(fmtHHMM(b.time)) + '</td><td>' + pct(b.rate) + '%</td><td>' +
+             b.ok + ' of ' + b.total + '</td></tr>';
+    }).join('');
+
+    var logRows = log.map(function (d) {
+      var m = DB.getMedication(d.medId);
+      return '<tr><td>' + esc(fmtDate(d.scheduledTs)) + '</td><td>' + esc(m ? m.name + ' ' + m.strength : 'Dose') +
+             '</td><td>' + esc(fmtHHMM(d.scheduled)) + '</td><td>' + esc(d.pickupTs ? fmtClock(d.pickupTs) : '—') +
+             '</td><td>' + esc(STATUS_LABEL[d.status]) + '</td></tr>';
+    }).join('');
+
+    $('#print-only').innerHTML =
+      '<div class="print-head">' + logoMark(44) +
+        '<div><h1>Dose Logic — adherence summary</h1>' +
+        '<p>' + esc(p.name) + ', age ' + p.age + '</p></div>' +
+        '<div class="meta"><div>Last ' + days + ' days</div>' +
+        '<div>Generated ' + esc(fmtLongDate(now())) + '</div></div></div>' +
+
+      '<div class="print-sec"><h2>Summary</h2><div class="print-stats">' +
+        '<div><b>' + pct(s.rate) + '%</b>taken</div>' +
+        '<div><b>' + s.taken + '</b>on time</div>' +
+        '<div><b>' + s.late + '</b>late</div>' +
+        '<div><b>' + s.missed + '</b>missed</div>' +
+        '<div><b>' + s.skipped + '</b>skipped</div></div>' +
+        '<p>Based on ' + s.resolved + ' scheduled doses whose window had closed at the time of printing. ' +
+        'A dose counts as taken when the dispenser released it and the pill was physically removed from the cup.</p></div>' +
+
+      '<div class="print-sec"><h2>Current schedule</h2><table class="print-tbl"><thead><tr>' +
+        '<th>Medication</th><th>Strength</th><th>Dose times</th><th>Pills</th></tr></thead>' +
+        '<tbody>' + medRows + '</tbody></table></div>' +
+
+      '<div class="print-sec"><h2>By time of day</h2><table class="print-tbl"><thead><tr>' +
+        '<th>Dose time</th><th>Taken</th><th>Count</th></tr></thead><tbody>' + todRows + '</tbody></table></div>' +
+
+      '<div class="print-sec"><h2>Dose log</h2><table class="print-tbl"><thead><tr>' +
+        '<th>Date</th><th>Medication</th><th>Scheduled</th><th>Picked up</th><th>Status</th>' +
+        '</tr></thead><tbody>' + logRows + '</tbody></table>' +
+        (log.length >= 60 ? '<p>Showing the 60 most recent doses in this range.</p>' : '') + '</div>' +
+
+      '<div class="print-foot"><p><b>Demo — simulated data.</b> This document was produced by a ' +
+      'demonstration build of Dose Logic. The patient, medications and history are fictional.</p>' +
+      '<p>Dose Logic records adherence events only. It does not check drug interactions, ' +
+      'recommend dosages, or provide medical advice. The dispenser stores only cartridge index, ' +
+      'timestamp and pill count — no patient identifiers are held on the device.</p></div>';
+  }
+
+  function exportSummary() {
+    buildPrintSummary();
+    announce('Print summary prepared. Opening the print dialog.');
+    // A frame lets the print DOM paint before the (blocking) print dialog opens.
+    requestAnimationFrame(function () { setTimeout(function () { window.print(); }, 60); });
+  }
+
+  /* ==================================================================
+     VIEW 5 — ALERTS
+     ================================================================== */
+  var SEV_LABEL = { informational:'Information', warning:'Warning', urgent:'Urgent' };
+  var SEV_ICON  = { informational:'info', warning:'warning', urgent:'urgent' };
+
+  function renderAlerts() {
+    var scoped = state.alertScope === 'patient';
+    var list = (scoped ? DB.getAlerts(state.patientId) : DB.getAlerts())
+                 .slice()
+                 .sort(function (a, b) { return alertTs(b) - alertTs(a); });
+    var unread = list.filter(function (a) { return !a.read; }).length;
+
+    var items = list.map(function (a) {
+      var p = DB.getPatient(a.patientId);
+      return '<article class="alert' + (a.read ? '' : ' alert--unread') + '">' +
+        '<span class="alert__sev alert__sev--' + a.severity + '" title="' + SEV_LABEL[a.severity] + '">' +
+          icon(SEV_ICON[a.severity], 18) +
+          '<span class="sr-only">' + SEV_LABEL[a.severity] + '</span></span>' +
+        '<div class="alert__main">' +
+          '<h3 class="alert__title">' + (a.read ? '' : '<span class="alert__unread-dot" aria-hidden="true"></span>') +
+            esc(a.title) + (a.read ? '' : '<span class="sr-only"> (unread)</span>') + '</h3>' +
+          '<p class="alert__what">' + esc(a.what) + '</p>' +
+          '<p class="alert__do">' + esc(a.action) + '</p>' +
+          '<p class="meta" style="margin-top:var(--sp-2)">' + esc(p ? p.name : '') + '</p>' +
+        '</div>' +
+        '<div class="stack" style="gap:var(--sp-2);align-items:flex-end">' +
+          '<span class="alert__time">' + esc(fmtAgo(alertTs(a))) + '</span>' +
+          (a.read ? '' : '<button class="btn btn--secondary btn--sm" type="button" data-alertread="' +
+             esc(a.id) + '">Mark read</button>') +
+        '</div>' +
+      '</article>';
+    }).join('');
+
+    var seg = '<button type="button" class="seg__btn" data-alertscope="all" aria-pressed="' + !scoped +
+              '">All patients</button><button type="button" class="seg__btn" data-alertscope="patient" aria-pressed="' +
+              scoped + '">' + esc(firstName(state.patientId)) + ' only</button>';
+
+    $('#view-alerts').innerHTML =
+      '<div class="view__head"><h1 id="h-alerts">Alerts</h1>' +
+      '<p>What happened, when, and what to do about it. Urgent items are missed doses and offline dispensers.</p></div>' +
+      '<div class="stack">' +
+        '<div class="row">' +
+          '<div class="seg" role="group" aria-label="Alert scope">' + seg + '</div>' +
+          '<button class="btn btn--secondary push" type="button" data-allread="1"' +
+            (unread ? '' : ' disabled') + '>Mark all read' + (unread ? ' (' + unread + ')' : '') + '</button>' +
+        '</div>' +
+        '<section class="rail" aria-label="Alert feed">' +
+          (items || '<div class="empty"><h3>No alerts</h3><p>Nothing needs your attention right now.</p></div>') +
+        '</section>' +
+      '</div>';
+  }
+
+  /* ==================================================================
+     VIEW 6 — SETTINGS
+     ================================================================== */
+  function renderSettings() {
+    var st = DB.getSettings(), e = st.escalation, pid = state.patientId;
+    var dev = DB.getDevice(pid);
+
+    function step(id, label, val, hint) {
+      return '<div class="field"><label for="' + id + '">' + label + '</label>' +
+             '<input type="number" id="' + id + '" min="0" max="720" step="5" value="' + val +
+             '" data-setting="' + id + '">' +
+             '<span class="field__hint">' + hint + '</span></div>';
+    }
+
+    var triggerDefs = [
+      ['doseMissed',   'A dose is missed'],
+      ['doseLate',     'A dose is taken late'],
+      ['waitingInCup', 'A pill is left waiting in the cup'],
+      ['cartridgeLow', 'A cartridge drops below a week'],
+      ['deviceOffline','The dispenser goes offline'],
+      ['weeklySummary','Weekly summary is ready']
+    ];
+    var triggers = triggerDefs.map(function (t) {
+      return '<label class="check"><input type="checkbox" data-trigger="' + t[0] + '"' +
+             (st.triggers[t[0]] ? ' checked' : '') + '><span>' + t[1] + '</span></label>';
+    }).join('');
+
+    var contacts = st.contacts.map(function (c) {
+      return '<div class="cart-row" style="cursor:default">' +
+        '<span class="cart-row__pos">' + esc(c.name.charAt(0)) + '</span>' +
+        '<span class="cart-row__name">' + esc(c.name) + '<small>' + esc(c.role + ' · ' + c.contact) + '</small></span>' +
+        (c.locked ? '<span class="meta">You</span>'
+                  : '<button class="btn btn--ghost btn--sm" type="button" data-contact="' + esc(c.id) + '">Edit</button>') +
+      '</div>';
+    }).join('');
+
+    $('#view-settings').innerHTML =
+      '<div class="view__head"><h1 id="h-settings">Settings</h1>' +
+      '<p>How and when Dose Logic contacts you, and who else gets told.</p></div>' +
+      '<div class="stack">' +
+
+        '<section class="panel" aria-labelledby="esc-h">' +
+          '<h2 id="esc-h">Escalation ladder</h2>' +
+          '<p class="meta" style="margin-top:var(--sp-2);max-width:60ch">Minutes after a dose is due. ' +
+          'Each step only fires if the pill is still sitting in the cup.</p>' +
+          '<div class="grid grid--3" style="margin-top:var(--sp-4);gap:var(--sp-4)">' +
+            step('escNudge',     'Nudge the patient',        e.nudgePatient,   'Chime and LED ring on the unit.') +
+            step('escPrimary',   'Notify you',               e.notifyPrimary,  'Push and SMS to the primary caregiver.') +
+            step('escSecondary', 'Notify secondary contact', e.notifySecondary,'Falls back to the care team list.') +
+          '</div>' +
+        '</section>' +
+
+        '<section class="panel" aria-labelledby="trig-h">' +
+          '<h2 id="trig-h">Notify me when</h2>' +
+          '<div class="checks" style="margin-top:var(--sp-4)">' + triggers + '</div>' +
+        '</section>' +
+
+        '<div class="grid grid--2">' +
+          '<section class="panel" aria-labelledby="quiet-h">' +
+            '<h2 id="quiet-h">Quiet hours</h2>' +
+            '<label class="check" style="margin-top:var(--sp-4)"><input type="checkbox" data-quiet="enabled"' +
+              (st.quietHours.enabled ? ' checked' : '') + '><span>Hold non-urgent alerts overnight</span></label>' +
+            '<div class="grid grid--2" style="margin-top:var(--sp-4);gap:var(--sp-4)">' +
+              '<div class="field"><label for="q-start">From</label>' +
+                '<input type="time" id="q-start" value="' + esc(st.quietHours.start) + '" data-quiet="start"></div>' +
+              '<div class="field"><label for="q-end">Until</label>' +
+                '<input type="time" id="q-end" value="' + esc(st.quietHours.end) + '" data-quiet="end"></div>' +
+            '</div>' +
+            '<p class="meta">Urgent alerts always come through.</p>' +
+          '</section>' +
+
+          '<section class="panel" aria-labelledby="pair-h">' +
+            '<h2 id="pair-h">Device pairing</h2>' +
+            '<div style="margin-top:var(--sp-4)">' + deviceLine(pid) + '</div>' +
+            '<dl class="kv" style="margin-top:var(--sp-4)">' +
+              '<dt>Paired unit</dt><dd>' + esc(dev.serial) + '</dd>' +
+              '<dt>Patient</dt><dd>' + esc(DB.getPatient(pid).name) + '</dd>' +
+              '<dt>Firmware</dt><dd>' + esc(dev.firmware) + '</dd>' +
+              '<dt>Power</dt><dd>' + esc(dev.power) + '</dd>' +
+            '</dl>' +
+            '<p class="meta" style="margin-top:var(--sp-4)">The dispenser stores only cartridge index, ' +
+            'timestamp and pill count. No patient identifiers are held on the device.</p>' +
+          '</section>' +
+        '</div>' +
+
+        '<section class="panel panel--flush" aria-labelledby="team-h">' +
+          '<div class="panel__head"><h2 id="team-h">Care team</h2>' +
+            '<button class="btn btn--secondary btn--sm" type="button" data-addcontact="1">Add contact</button></div>' +
+          '<div class="panel__body"><div class="cart-list">' + contacts + '</div></div>' +
+        '</section>' +
+
+      '</div>';
+  }
+
+  /* ==================================================================
+     VIEW 7 — PATIENT VIEW
+     Deliberately a different mode: no analytics, no navigation depth, and
+     nothing smaller than 24px. It answers three questions only — what,
+     when, and has it been taken.
+     ================================================================== */
+  function renderPatient() {
+    var pid = state.patientId, p = DB.getPatient(pid);
+    var doses = todayDoses(pid);
+
+    var live = doses.filter(function (d) {
+      return d.status === 'due' || d.status === 'dispensed_not_taken';
+    });
+    var upcoming = doses.filter(function (d) { return d.status === 'upcoming'; });
+    var done = doses.filter(function (d) {
+      return d.status === 'taken' || d.status === 'late';
+    });
+
+    function doseList(arr) {
+      return '<ul class="pv__list">' + arr.map(function (d) {
+        var m = DB.getMedication(d.medId);
+        return '<li><b>' + esc(m ? m.name : 'Dose') + '</b><span>' +
+               esc((m ? m.strength : '') + ' — ' + d.qty + ' pill' + (d.qty === 1 ? '' : 's')) + '</span></li>';
+      }).join('') + '</ul>';
+    }
+
+    var nowCard;
+    if (live.length) {
+      var first = live[0];
+      var isCup = first.status === 'dispensed_not_taken';
+      nowCard = '<div class="pv__card pv__card--now">' +
+        '<p class="label" style="font-size:1rem">' + (isCup ? 'Ready in the cup' : 'Time to take') + '</p>' +
+        '<p class="pv__time">' + esc(fmtHHMM(first.scheduled)) + '</p>' +
+        '<p class="pv__what">Take ' + live.length + ' ' + (live.length === 1 ? 'pill' : 'pills') + '</p>' +
+        doseList(live) +
+        '<div class="pv__state">' + chip(first.status, { iconSize: 24 }) + '</div>' +
+        (isCup ? '<button class="btn btn--primary pv__btn" style="margin-top:var(--sp-5)" type="button" ' +
+                 'data-pickup="' + esc(first.id) + '">I have taken these</button>' : '') +
+      '</div>';
+    } else if (upcoming.length) {
+      var nxt = upcoming[0];
+      var group = upcoming.filter(function (d) { return d.scheduledTs === nxt.scheduledTs; });
+      nowCard = '<div class="pv__card pv__card--now">' +
+        '<p class="label" style="font-size:1rem">Next</p>' +
+        '<p class="pv__time">' + esc(fmtHHMM(nxt.scheduled)) + '</p>' +
+        '<p class="pv__what">In ' + esc(fmtDuration(nxt.scheduledTs - now())) + '</p>' +
+        doseList(group) +
+        '<div class="pv__state">' + chip('upcoming', { iconSize: 24 }) +
+        '<span>The dispenser will release these for you.</span></div>' +
+      '</div>';
+    } else {
+      nowCard = '<div class="pv__card pv__card--now">' +
+        '<p class="pv__what">All done for today</p>' +
+        '<p style="margin-top:var(--sp-3)">Nothing else to take. The next dose is tomorrow morning.</p></div>';
+    }
+
+    $('#view-patient').innerHTML =
+      '<div class="pv">' +
+        '<div class="pv__banner">' +
+          '<p class="label">Patient view — simulated data</p>' +
+          '<h1 id="h-patient">Hello, ' + esc(firstName(pid)) + '</h1>' +
+          '<p style="margin-top:var(--sp-2);font-size:1.25rem">' + esc(fmtLongDate(now())) + '</p>' +
+        '</div>' +
+        nowCard +
+        (done.length
+          ? '<div class="pv__card"><p class="label" style="font-size:1rem">Already taken today</p>' +
+            doseList(done) + '<div class="pv__state">' + chip('taken', { iconSize: 24 }) + '</div></div>'
+          : '') +
+        (upcoming.length && live.length
+          ? '<div class="pv__card"><p class="label" style="font-size:1rem">Later today</p>' +
+            doseList(upcoming) + '</div>'
+          : '') +
+        '<button class="btn btn--secondary pv__btn" style="width:100%" type="button" data-go="home">' +
+          'Back to caregiver view</button>' +
+      '</div>';
+  }
+
+  /* ==================================================================
+     DEMO SIMULATOR
+     Fires real state changes into the live app. Everything routes through
+     commit(), so a dispense triggered on Home is already true on Cartridges
+     before you navigate there — nothing is faked per-screen.
+     ================================================================== */
+  function pendingDose(pid, statuses) {
+    var order = { due:0, dispensed_not_taken:1, upcoming:2 };
+    return DB.getDoseLog(pid)
+      .filter(function (d) { return statuses.indexOf(d.status) !== -1; })
+      .sort(function (a, b) {
+        var s = order[a.status] - order[b.status];
+        return s !== 0 ? s : a.scheduledTs - b.scheduledTs;
+      })[0] || null;
+  }
+
+  function demoDispense() {
+    var pid = state.patientId;
+    var d = pendingDose(pid, ['due', 'upcoming']);
+    if (!d) return toast('No dose left to dispense today. Try "Reset demo".');
+    var med = DB.getMedication(d.medId);
+
+    commit(function () {
+      d.status = 'dispensed_not_taken';
+      d.dispensedTs = now();
+      d.pickupTs = null;
+      consumeFromCartridge(pid, d.cartridge, d.qty);
+      state.lastDispensedId = d.id;
+      var dev = DB.getDevice(pid);
+      syncCupState(pid);
+      dev.carouselIndex = d.cartridge;
+      // Rotate the ring so the active cartridge sits under the fixed chute.
+      state.carouselSpin = -d.cartridge * 45;
+      state.selectedCartridge = d.cartridge;
+      pushAlert(pid, 'warning', med.name + ' is waiting in the cup',
+        'The dispenser released the ' + fmtHHMM(d.scheduled) + ' dose and it has not been picked up.',
+        'Call ' + firstName(pid) + ', or mark it skipped if the dose is not needed.');
+    }, {
+      toast: med.name + ' dispensed to the cup.',
+      announce: med.name + ' ' + med.strength + ' dispensed into the cup and waiting to be picked up.',
+      assertive: true
+    });
+  }
+
+  function markPickedUp(doseId) {
+    var d = DB.getDose(doseId);
+    if (!d) return;
+    var med = DB.getMedication(d.medId);
+    var pid = d.patientId;
+
+    commit(function () {
+      // The hardware distinguishes these two by timestamp delta, not by a flag,
+      // so the app derives the same way rather than being told.
+      var wasLate = now() > d.scheduledTs + WINDOW_RULES.lateAfter * MS_MIN;
+      if (!d.dispensedTs) { d.dispensedTs = now(); consumeFromCartridge(pid, d.cartridge, d.qty); }
+      d.pickupTs = now();
+      d.status = wasLate ? 'late' : 'taken';
+      syncCupState(pid);
+      DB.alerts.forEach(function (a) {
+        if (a.patientId === pid && a.title.indexOf(med.name) === 0) a.read = true;
+      });
+    }, {
+      toast: med.name + ' marked as picked up.',
+      announce: med.name + ' picked up. The cup is clear.'
+    });
+    if (modalIsOpen()) closeModal();
+  }
+
+  function skipDose(doseId) {
+    var d = DB.getDose(doseId);
+    if (!d) return;
+    var med = DB.getMedication(d.medId);
+    commit(function () {
+      d.status = 'skipped';
+      d.pickupTs = null;
+      syncCupState(d.patientId);
+    }, {
+      toast: med.name + ' dose skipped.',
+      announce: med.name + ' dose marked as skipped. It will not count against adherence.'
+    });
+    if (modalIsOpen()) closeModal();
+  }
+
+  /* Prefers the dose the presenter just dispensed, so "trigger dispense ->
+     simulate pickup" completes the lifecycle on the same pill instead of
+     silently acting on an older one still sitting in the cup. */
+  function demoPickup() {
+    var pid = state.patientId;
+    var waiting = DB.getDoseLog(pid).filter(function (x) { return x.status === 'dispensed_not_taken'; });
+    if (!waiting.length) return toast('Nothing is waiting in the cup. Trigger a dispense first.');
+    var d = waiting.filter(function (x) { return x.id === state.lastDispensedId; })[0] || waiting[0];
+    markPickedUp(d.id);
+  }
+
+  function demoMissed() {
+    var pid = state.patientId;
+    var d = pendingDose(pid, ['due', 'dispensed_not_taken', 'upcoming']);
+    if (!d) return toast('No open dose to miss. Try "Reset demo".');
+    var med = DB.getMedication(d.medId);
+
+    commit(function () {
+      if (!d.dispensedTs) { d.dispensedTs = d.scheduledTs; consumeFromCartridge(pid, d.cartridge, d.qty); }
+      d.status = 'missed';
+      d.pickupTs = null;
+      syncCupState(pid);
+      pushAlert(pid, 'urgent', med.name + ' missed',
+        'The ' + fmtHHMM(d.scheduled) + ' dose window closed with no pickup.',
+        'Check on ' + firstName(pid) + ' and consider moving the reminder earlier.');
+    }, {
+      toast: med.name + ' marked as missed.',
+      announce: med.name + ' missed. An urgent alert has been raised.',
+      assertive: true
+    });
+  }
+
+  function demoToggleDevice() {
+    var pid = state.patientId, dev = DB.getDevice(pid);
+    commit(function () {
+      dev.online = !dev.online;
+      dev.lastSyncOffsetMin = dev.online ? 1 : dev.lastSyncOffsetMin;
+      if (dev.online) {
+        pushAlert(pid, 'informational', 'Dispenser back online',
+          dev.serial + ' reconnected and synced.',
+          'No action needed. Doses missed while offline stay in the log.');
+      } else {
+        pushAlert(pid, 'urgent', 'Dispenser is offline',
+          dev.serial + ' stopped reporting.',
+          'Check the unit has power and is in Wi-Fi range.');
+      }
+    }, {
+      toast: 'Dispenser is now ' + (dev.online ? 'online' : 'offline') + '.',
+      announce: 'Dispenser for ' + firstName(pid) + ' is now ' + (dev.online ? 'online' : 'offline') + '.',
+      assertive: !dev.online
+    });
+  }
+
+  function demoLowCartridge() {
+    var pid = state.patientId;
+    // Pick the fullest cartridge so the drop is unmistakable on screen.
+    var target = DB.getCartridges(pid)
+      .filter(function (c) { return c.medId && !isLow(pid, c.position); })
+      .sort(function (a, b) { return (daysRemaining(pid, b.position) || 0) - (daysRemaining(pid, a.position) || 0); })[0];
+    if (!target) return toast('Every loaded cartridge is already low.');
+    var med = DB.getMedication(target.medId);
+
+    commit(function () {
+      target.count = Math.max(1, dailyUse(pid, target.position) * 3);
+      state.selectedCartridge = target.position;
+      pushAlert(pid, 'informational', med.name + ' cartridge is low',
+        'Cartridge ' + target.position + ' is down to ' + target.count + ' pills, about 3 days.',
+        'Refill it, then log the refill so the estimate resets.');
+    }, {
+      toast: med.name + ' dropped to ' + target.count + ' pills.',
+      announce: med.name + ' cartridge is low, about three days remaining.'
+    });
+  }
+
+  function demoJump(hours) {
+    commit(function () {
+      state.clockMs += hours * MS_HOUR;
+      // An offline unit has not synced during the jump; an online one has.
+      DB.getPatients().forEach(function (p) {
+        var dev = DB.getDevice(p.id);
+        if (!dev.online) dev.lastSyncOffsetMin += hours * 60;
+        else dev.lastSyncOffsetMin = Math.min(dev.lastSyncOffsetMin, 4);
+      });
+    }, {
+      toast: 'Clock moved forward ' + hours + ' hour' + (hours === 1 ? '' : 's') + ' to ' + fmtClock(state.clockMs) + '.',
+      announce: 'App clock is now ' + fmtClock(state.clockMs) + ' on ' + fmtDate(state.clockMs) + '.'
+    });
+  }
+
+  var SNAPSHOT = null;
+  function takeSnapshot() {
+    SNAPSHOT = JSON.parse(JSON.stringify({
+      medications: DB.medications, cartridges: DB.cartridges,
+      devices: DB.devices, alerts: DB.alerts, settings: DB.settings
+    }));
+  }
+  function demoReset() {
+    commit(function () {
+      var s = JSON.parse(JSON.stringify(SNAPSHOT));
+      DB.medications = s.medications; DB.cartridges = s.cartridges;
+      DB.devices = s.devices; DB.alerts = s.alerts; DB.settings = s.settings;
+      state.clockMs = INITIAL_CLOCK;
+      state.carouselSpin = 0;
+      state.selectedCartridge = 4;
+      state.scanIndex = 0;
+      state.historyRange = 30;
+      DB.rebuild(INITIAL_CLOCK);
+    }, { toast: 'Demo reset to the starting state.', announce: 'Demo reset to the starting state.' });
+  }
+
+  function renderDemoPanel() {
+    var dev = DB.getDevice(state.patientId);
+    $('#demo-body').innerHTML =
+      '<div class="demo-group"><p class="label">Dose lifecycle</p><div class="demo-btns">' +
+        '<button class="btn btn--primary" type="button" data-demo="dispense">Trigger dispense</button>' +
+        '<button class="btn btn--secondary" type="button" data-demo="pickup">Simulate pickup</button>' +
+        '<button class="btn btn--secondary" type="button" data-demo="missed">Simulate missed dose</button>' +
+      '</div><p class="demo-note">Acts on ' + esc(firstName(state.patientId)) + '’s next open dose.</p></div>' +
+
+      '<div class="demo-group"><p class="label">Device</p><div class="demo-btns demo-btns--split">' +
+        '<button class="btn btn--secondary" type="button" data-demo="device">' +
+          (dev.online ? 'Take offline' : 'Bring online') + '</button>' +
+        '<button class="btn btn--secondary" type="button" data-demo="low">Drop cartridge low</button>' +
+      '</div></div>' +
+
+      '<div class="demo-group"><p class="label">Clock — now ' + esc(fmtClock(now())) + '</p>' +
+      '<div class="demo-btns demo-btns--three">' +
+        '<button class="btn btn--secondary" type="button" data-demo="jump1">+1 h</button>' +
+        '<button class="btn btn--secondary" type="button" data-demo="jump4">+4 h</button>' +
+        '<button class="btn btn--secondary" type="button" data-demo="jump12">+12 h</button>' +
+      '</div><p class="demo-note">Open doses resolve the way the firmware would when their window closes.</p></div>' +
+
+      '<div class="demo-group"><p class="label">Start over</p><div class="demo-btns">' +
+        '<button class="btn btn--secondary" type="button" data-demo="reset">Reset demo</button>' +
+      '</div></div>';
+  }
+
+  function toggleDemo(open) {
+    state.demoOpen = open === undefined ? !state.demoOpen : open;
+    $('#demo-panel').hidden = !state.demoOpen;
+    $('#demo-fab').setAttribute('aria-expanded', String(state.demoOpen));
+    if (state.demoOpen) {
+      renderDemoPanel();
+      var b = $('#demo-body button'); if (b) b.focus();
+    } else {
+      $('#demo-fab').focus();
+    }
+  }
+
+  var DEMO_ACTIONS = {
+    dispense: demoDispense, pickup: demoPickup, missed: demoMissed,
+    device: demoToggleDevice, low: demoLowCartridge, reset: demoReset,
+    jump1: function () { demoJump(1); },
+    jump4: function () { demoJump(4); },
+    jump12: function () { demoJump(12); }
+  };
+
+  /* ==================================================================
+     RENDER + EVENTS
+     ================================================================== */
+  var VIEW_FNS = {
+    home: renderHome, schedule: renderSchedule, cartridges: renderCartridges,
+    history: renderHistory, alerts: renderAlerts, settings: renderSettings,
+    patient: renderPatient
+  };
+
+  function render() {
+    renderNav();
+    renderPatientSeg();
+    (VIEW_FNS[state.view] || renderHome)();
+    ALL_VIEWS.forEach(function (id) {
+      var node = $('#view-' + id);
+      if (node) node.hidden = (id !== state.view);
+    });
+    if (state.demoOpen) renderDemoPanel();
+    // Kept current on every render so a plain Ctrl+P prints something sensible,
+    // not just the "Export summary" path.
+    buildPrintSummary();
+  }
+
+  function attr(e, name) {
+    var node = e.target.closest ? e.target.closest('[' + name + ']') : null;
+    return node ? { node: node, value: node.getAttribute(name) } : null;
+  }
+
+  function onClick(e) {
+    var a;
+
+    if ((a = attr(e, 'data-modal-close'))) { closeModal(); return; }
+    if (e.target.id === 'modal-scrim' || e.target.id === 'modal-close') { closeModal(); return; }
+
+    if ((a = attr(e, 'data-go')))      { closeModal(); go(a.value); return; }
+    if ((a = attr(e, 'data-patient'))) {
+      state.patientId = a.value;
+      state.selectedCartridge = 0;
+      state.carouselSpin = 0;
+      commit(null, { announce: 'Now viewing ' + DB.getPatient(a.value).name + '.' });
+      return;
+    }
+
+    if ((a = attr(e, 'data-pickup')))  { markPickedUp(a.value); return; }
+    if ((a = attr(e, 'data-skip')))    { skipDose(a.value); return; }
+    if ((a = attr(e, 'data-dose')))    { openDoseDetail(a.value); return; }
+
+    if ((a = attr(e, 'data-scan')))       { startScan(); return; }
+    if ((a = attr(e, 'data-usescan')))    { openMedForm(null); return; }
+    if ((a = attr(e, 'data-addmed')))     { openMedForm(null); return; }
+    if ((a = attr(e, 'data-editmed')))    { openMedForm(a.value); return; }
+    if ((a = attr(e, 'data-delmed')))     { confirmRemoveMed(a.value); return; }
+    if ((a = attr(e, 'data-savemed')))    { saveMedForm(); return; }
+    if ((a = attr(e, 'data-confirmsync'))){ runSync(); return; }
+
+    if ((a = attr(e, 'data-cart')))   { state.selectedCartridge = +a.value; render(); return; }
+    if ((a = attr(e, 'data-refill'))) { refillCartridge(+a.value); return; }
+    if ((a = attr(e, 'data-assign'))) { state.prefill = null; openMedForm(null); return; }
+
+    if ((a = attr(e, 'data-range')))      { state.historyRange = +a.value; render(); return; }
+    if ((a = attr(e, 'data-print')))      { exportSummary(); return; }
+    if ((a = attr(e, 'data-alertscope'))) { state.alertScope = a.value; render(); return; }
+
+    if ((a = attr(e, 'data-alertread'))) {
+      var id = a.value;
+      commit(function () {
+        DB.alerts.forEach(function (x) { if (x.id === id) x.read = true; });
+      }, { announce: 'Alert marked as read.' });
+      return;
+    }
+    if ((a = attr(e, 'data-allread'))) {
+      commit(function () { DB.alerts.forEach(function (x) { x.read = true; }); },
+             { toast: 'All alerts marked read.', announce: 'All alerts marked as read.' });
+      return;
+    }
+
+    if ((a = attr(e, 'data-addcontact')) || (a = attr(e, 'data-contact'))) {
+      openModal('Care team',
+        '<p>Editing care team contacts is part of the production app and is not wired up in this demo build.</p>' +
+        '<p class="meta" style="margin-top:var(--sp-3)">The escalation ladder above already shows who would be ' +
+        'contacted and in what order.</p>',
+        '<button class="btn btn--primary" type="button" data-modal-close="1">Got it</button>');
+      return;
+    }
+
+    if ((a = attr(e, 'data-demo'))) { (DEMO_ACTIONS[a.value] || function () {})(); return; }
+  }
+
+  function onChange(e) {
+    var t = e.target, st = DB.getSettings();
+
+    if (t.hasAttribute('data-setting')) {
+      var map = { escNudge:'nudgePatient', escPrimary:'notifyPrimary', escSecondary:'notifySecondary' };
+      var key = map[t.getAttribute('data-setting')];
+      var v = Math.max(0, parseInt(t.value, 10) || 0);
+      commit(function () { st.escalation[key] = v; },
+             { toast: 'Escalation updated.', announce: 'Escalation step set to ' + v + ' minutes.' });
+      return;
+    }
+    if (t.hasAttribute('data-trigger')) {
+      var k = t.getAttribute('data-trigger'), on = t.checked;
+      commit(function () { st.triggers[k] = on; },
+             { announce: 'Notification ' + (on ? 'enabled' : 'disabled') + '.' });
+      return;
+    }
+    if (t.hasAttribute('data-quiet')) {
+      var q = t.getAttribute('data-quiet');
+      var val = q === 'enabled' ? t.checked : t.value;
+      commit(function () { st.quietHours[q] = val; }, { announce: 'Quiet hours updated.' });
+      return;
+    }
+  }
+
+  function onKeydown(e) {
+    if (e.key === 'Escape') {
+      if (modalIsOpen()) { closeModal(); return; }
+      if (state.demoOpen) { toggleDemo(false); return; }
+    }
+    trapFocus(e);
+
+    // SVG <g> and <tr> are not natively activatable, so give them the same
+    // Enter/Space behaviour a button would have.
+    if (e.key === 'Enter' || e.key === ' ') {
+      var t = e.target;
+      if (t.classList && (t.classList.contains('cart-hit') || t.classList.contains('tbl__row'))) {
+        e.preventDefault();
+        t.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      }
+    }
+  }
+
+  /* ------------------------------------------------------------------ boot */
+  function boot() {
+    DB.seedDoseLog(INITIAL_CLOCK);
+    takeSnapshot();
+
+    state.alertScope = 'all';
+    state.view = readHash();
+
+    $('#brand-mark').innerHTML = logoMark(34);
+    $('#demo-fab-icon').innerHTML = icon('sliders', 18);
+    var gear = $('#topbar-settings');
+    if (gear) gear.innerHTML = icon('settings', 18) + '<span class="sr-only">Settings</span>';
+
+    document.addEventListener('click', onClick);
+    document.addEventListener('change', onChange);
+    document.addEventListener('keydown', onKeydown);
+    $('#demo-fab').addEventListener('click', function () { toggleDemo(); });
+    $('#demo-close').addEventListener('click', function () { toggleDemo(false); });
+
+    if (HASH_ROUTING) window.addEventListener('hashchange', function () {
+      var id = readHash();
+      if (id !== state.view) { state.view = id; render(); }
+    });
+
+    if (HASH_ROUTING && !location.hash) location.hash = '#/home';
+    render();
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+
+})();
+</script>
+</body>
+</html>
+index.html
+Displaying index.html.

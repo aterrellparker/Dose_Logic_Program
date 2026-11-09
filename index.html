@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, 
+				initial-scale=1.0">
+	<link rel="stylesheet" href="css/alarm.css">
+	<script src="js/script.js" defer></script> <!-- Defer tag will load after body-->
+	<script src="js/alarm.js" defer></script>
+
+	<title>Advanced Alarm Clock</title>
+</head>
+
+<body>
+	<div class="clock">
+		<div class="time" id="time">
+			00:00:00
+		</div>
+
+		<div class="control-container">
+			<div class="input-row">
+				<div class="input-field">
+
+					<input type="date" id="alarmDate" class="alarm-input" min="">
+				</div>
+				<div class="input-field">
+					<input type="time" id="alarmTime" class="alarm-input">
+				</div>
+				<button id="setAlarm" class="button">Set Alarm</button>
+			</div>
+			<div class="input-row">
+				<button id="toggleLED" class="button">Toggle LED</button>
+				<button id="rotateMotor" class="button">Dispense 1</button>
+				<button id="rotateMotor" class="button">Dispense 2</button>
+
+			</div>
+		</div>
+
+		<div class="alarms" id="alarms">
+
+		</div>
+	</div>
+	<div class="clock">
+		<h2 id="dispenser-title">Dispenser Status</h2>
+		<p class="status">
+			<span class="dot offline" id="status-dot" aria-hidden="true"></span>
+			<strong id="connection-status">Offline</strong>
+		</p>
+		<p id="last-sync">Never connected</p>
+		<form id="device-form">
+			<label for="device-ip">ESP32 IP address:</label>
+			<div class="button-row">
+				<input id="device-ip" type="text" placeholder="172.16.3.201" required>
+				<button type="submit" class="button">Connect</button>
+			</div>
+		</form>
+	</div>
+
+	<script src="https://gh-canon.github.io/stack-snippet-console/console.min.js"></script>
+
+	<script>
+		console.config({
+			maximize: false,
+			timeStamps: true,
+		});
+
+		console.log("Hello!");
+	</script>
+</body>
+
+</html>
