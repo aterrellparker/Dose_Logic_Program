@@ -1,0 +1,248 @@
+body {
+    font-family: Arial, sans-serif;
+    /* background:
+        linear-gradient(45deg, #007bff, #27ae60); */
+    background-color: #F3F5F6;
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    margin: 0;
+}
+
+.clock {
+    text-align: center;
+    background-color: #1A1A1A;
+    border-radius: 10px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+    padding: 20px;
+    width: 50%;
+    margin: 20px;
+}
+
+.time {
+    font-size: 2rem;
+    margin: 20px 0;
+    /* color: #333; */
+}
+
+.input-row {
+    display: flex;
+    flex-direction: row;
+    gap: 25px;
+    align-items: center;
+    justify-content: center;
+}
+
+.input-field {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.control-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 25px;
+}
+
+.button-container {
+    display: flex;
+    /* Lines items up horizontally */
+    gap: 15px;
+    /* Adds clean spacing between items */
+    /* optional alignment controls: */
+    align-items: center;
+    justify-content: center;
+    /* Aligns items to the left (center, space-between, etc.) */
+}
+
+input[type="date"],
+input[type="time"] {
+    padding: 10px;
+    font-size: 1rem;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    width: 100%;
+    max-width: 200px;
+}
+
+.button-row {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    align-items: center;
+}
+
+/* #setAlarm,
+#dispense,
+#updateTime  */
+.button
+{
+    background-color: #9b1b1f;
+    color: #fff;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: background-color 0.3s;
+}
+
+#setAlarm:hover,
+#updateTime:hover {
+    background-color: #0056b3;
+}
+
+.alarms {
+    margin-top: 20px;
+    text-align: left;
+    color: #333;
+}
+
+.alarm {
+    background-color: #f0f0f0;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    padding: 10px;
+    margin: 10px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    animation: fadeIn 0.5s ease-in-out;
+    font-size: 14px;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+/****/
+.card {
+    max-width: 440px;
+    padding: 24px;
+    background: #fff;
+    border: 1px solid #DDE2E5;
+    border-radius: 14px
+}
+
+h2 {
+    margin: 0 0 16px;
+    font-size: 13px;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    color: #fff
+}
+
+.status {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin: 0 0 6px;
+    color: #fff;
+    font-size: 14px;
+}
+
+.status strong {
+    color: #fff;
+    font-size: 17px
+}
+
+.dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #157F3F
+}
+
+.dot.offline {
+    box-sizing: border-box;
+    background: transparent;
+    border: 2px solid #B36B00
+}
+
+.separator {
+    color: #DDE2E5
+}
+
+dl {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 8px 16px;
+    margin: 0;
+    font-size: 14px
+}
+
+dt {
+    font-weight: bold;
+    color: #fff
+}
+
+dd {
+    margin: 0;
+    font-weight: 600
+}
+
+#device-form label {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 14px;
+}
+
+#device-form .button-row {
+    flex-wrap: wrap;
+}
+
+#last-sync {
+    margin: 0 0 20px;
+    font-size: 14px;
+    color: #DDE2E5;
+}
+
+#device-ip {
+    flex: 1;
+    min-width: 0;
+    padding: 10px 12px;
+    border: 1px solid #aaa;
+    border-radius: 8px;
+    background: #fff;
+    color: #1a1a1a;
+    font: inherit;
+}
+
+#device-ip:focus {
+    outline: 2px solid #fff;
+    outline-offset: 2px;
+}
+
+/* #device-form {
+    display: flex;
+    gap: 8px;
+    max-width: 360px;
+    margin: 0 auto 16px;
+} */
+
+
+/* 
+#device-form button {
+    padding: 10px 16px;
+    border: 0;
+    border-radius: 8px;
+    background: #fff;
+    color: #1a1a1a;
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+} */

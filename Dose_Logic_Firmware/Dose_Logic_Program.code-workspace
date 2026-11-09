@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"path": "../.."
+		},
+		{
+			"name": "Dose_Logic_Firmware",
+			"path": ".."
+		}
+	],
+	"settings": {
+		"hide-files.files": []
+	}
+}
